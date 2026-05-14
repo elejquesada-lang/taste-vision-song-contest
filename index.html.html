@@ -1,0 +1,1733 @@
+<!--
+═══════════════════════════════════════════════════════════════════════
+  TASTE-VISION SONG CONTEST — SETUP GUIDE
+═══════════════════════════════════════════════════════════════════════
+
+  This application requires a FREE Firebase account to enable
+  real-time voting across multiple devices. Follow the steps below
+  to connect your own database. Takes about 5 minutes.
+
+  ── STEP 1: Create a Firebase project ─────────────────────────────
+  1. Go to https://console.firebase.google.com
+  2. Click "Add project"
+  3. Give it a name (e.g. "my-song-contest")
+  4. Click Continue → enable or disable Google Analytics as you prefer
+  5. Click "Create project" and wait for it to finish
+
+  ── STEP 2: Create a Realtime Database ────────────────────────────
+  1. In the left sidebar click "Build" → "Realtime Database"
+  2. Click "Create database"
+  3. Choose your region (pick closest to your event location)
+  4. Select "Start in test mode" → click "Enable"
+  5. Your database is now live
+
+  ── STEP 3: Get your Firebase config values ───────────────────────
+  1. Click the ⚙ gear icon (top left) → "Project settings"
+  2. Scroll down to "Your apps"
+  3. Click the </> (Web) icon
+  4. Enter any nickname (e.g. "contest-app") → click "Register app"
+  5. Firebase shows you a config block — copy the values from it
+
+  ── STEP 4: Fill in your values ───────────────────────────────────
+  Search for "const FIREBASE_CONFIG" in this file (around line 820).
+  Replace each empty string '' with the value from your Firebase
+  config. Keep the quotes. Do NOT share this file publicly once
+  your values are filled in — it contains your API credentials.
+
+  ── STEP 5: Deploy ────────────────────────────────────────────────
+  1. Save this file
+  2. Go to https://app.netlify.com/drop
+  3. Drag and drop this file onto the page
+  4. Netlify gives you a public URL — share it with your voters!
+  5. Show the QR code from the Host panel for easy mobile access
+
+  ── SECURITY NOTE ─────────────────────────────────────────────────
+  Your database starts in "test mode" which allows anyone with the
+  URL to read and write. This is fine for a private event. After
+  your event, go to Firebase Console → Realtime Database → Rules
+  and set ".write" to false to lock it down.
+
+  ── TROUBLESHOOTING ───────────────────────────────────────────────
+  • "Voting Closed" on voter phones → make sure the host has clicked
+    "Open Voting" in the Host Panel
+  • Votes not syncing → check that databaseURL is filled in and that
+    your Firebase project has Realtime Database enabled
+  • App shows spinner indefinitely → your Firebase config has an
+    error; double-check all values are copied correctly
+  • Flags not showing → you need an internet connection for the
+    first load; after that flags are cached by the browser
+
+═══════════════════════════════════════════════════════════════════════
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0A0014">
+<title>Taste-Vision Song Contest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --gold:#FFD700;--hot:#FF2D78;--cyan:#00E5FF;--purple:#7B2FBE;
+  --dark:#0A0014;--card:#120020;--card2:#1a002e;
+  --border:rgba(255,255,255,0.11);--text:#F0E6FF;--muted:#9A85B0;
+  --green:#00FF88;--orange:#FF6B00;
+  --sbot:env(safe-area-inset-bottom,0px);
+  --stop:env(safe-area-inset-top,0px);
+}
+html{height:100%;background:var(--dark)}
+body{min-height:100%;background:var(--dark);color:var(--text);
+  font-family:'Outfit',sans-serif;overflow-x:hidden;
+  -webkit-tap-highlight-color:transparent;
+  padding-top:var(--stop);padding-bottom:var(--sbot)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ── Emoji image rendering ───────────────────────────── */
+.ei{display:inline-block;vertical-align:middle;object-fit:contain;flex-shrink:0}
+.ei-sm{width:1.15rem;height:1.15rem}
+.ei-md{width:1.5rem;height:1.5rem}
+.ei-lg{width:2rem;height:2rem}
+.ei-xl{width:2.6rem;height:2.6rem}
+.ei-winner{width:4rem;height:4rem}
+
+/* ── Stars ───────────────────────────────────────────── */
+#sf{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+.star{position:absolute;border-radius:50%;background:#fff;
+  animation:twinkle var(--d,3s) ease-in-out infinite alternate}
+@keyframes twinkle{0%{opacity:.08;transform:scale(1)}100%{opacity:.7;transform:scale(1.4)}}
+
+/* ── Screen ──────────────────────────────────────────── */
+.screen{position:relative;z-index:1;min-height:100svh;
+  padding:1rem;padding-bottom:calc(1.5rem + var(--sbot));
+  max-width:640px;margin:0 auto}
+
+/* ── Logo ────────────────────────────────────────────── */
+.logo{font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(1.6rem,7vw,3rem);letter-spacing:4px;
+  background:linear-gradient(135deg,var(--gold) 0%,var(--hot) 40%,var(--cyan) 70%,var(--purple) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  line-height:1;display:block}
+.tagline{font-size:.75rem;letter-spacing:.18em;color:var(--muted);
+  text-transform:uppercase;margin-top:.3rem}
+
+/* ── Toastmasters logo block ─────────────────────────── */
+.tm-logo-wrap{display:flex;align-items:center;justify-content:center;
+  gap:.9rem;margin-bottom:.6rem}
+.tm-svg{flex-shrink:0;filter:drop-shadow(0 2px 16px rgba(119,36,50,.6))}
+.tm-wordmark{text-align:left}
+.tm-word-top{font-family:'Bebas Neue',sans-serif;font-size:clamp(.9rem,3.5vw,1.25rem);
+  letter-spacing:.22em;color:#F2DF74;line-height:1;text-transform:uppercase}
+.tm-word-int{font-family:'Outfit',sans-serif;font-size:clamp(.55rem,2vw,.7rem);
+  letter-spacing:.15em;color:#A9B2B1;text-transform:uppercase;margin-top:.1rem}
+.tm-divider{width:100%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(242,223,116,.3),transparent);
+  margin:.5rem 0}
+
+/* ── Cards ───────────────────────────────────────────── */
+.card{background:var(--card);border:1px solid var(--border);
+  border-radius:18px;padding:1.25rem;
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.card-sm{padding:.875rem;border-radius:13px}
+.card-xs{padding:.65rem .875rem;border-radius:10px}
+
+/* ── Buttons (48px min touch) ────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45rem;
+  min-height:48px;font-family:'Outfit',sans-serif;font-weight:600;
+  font-size:.92rem;cursor:pointer;border:none;border-radius:12px;
+  padding:.7rem 1.3rem;transition:transform .12s,opacity .15s;
+  -webkit-user-select:none;user-select:none}
+.btn:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+.btn:active{transform:scale(.95);opacity:.85}
+.btn:disabled{opacity:.38;pointer-events:none}
+.btn-primary{background:linear-gradient(135deg,var(--hot),var(--purple));color:#fff}
+.btn-secondary{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--border)}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#FF9500);color:#000;font-weight:800}
+.btn-danger{background:rgba(255,60,60,.14);color:#FF7070;border:1px solid rgba(255,60,60,.28)}
+.btn-sm{min-height:40px;padding:.5rem 1rem;font-size:.84rem;border-radius:10px}
+.btn-xs{min-height:36px;padding:.4rem .75rem;font-size:.78rem;border-radius:8px}
+.btn-full{width:100%}
+
+/* ── Reveal two-column layout ───────────────────────── */
+.reveal-screen{position:relative;z-index:1;min-height:100svh;
+  padding:1rem;padding-bottom:calc(1rem + var(--sbot));
+  max-width:1200px;margin:0 auto}
+.reveal-header{margin-bottom:.75rem}
+.reveal-body{display:grid;grid-template-columns:1fr;gap:.85rem}
+@media(min-width:700px){
+  .reveal-body{grid-template-columns:1fr 1fr;align-items:start}
+}
+/* Scoreboard col scrolls independently on desktop so it never overflows */
+.reveal-right{display:flex;flex-direction:column;gap:0}
+@media(min-width:700px){
+  .reveal-right{max-height:calc(100vh - 140px);overflow-y:auto;
+    -webkit-overflow-scrolling:touch;padding-right:2px}
+  .reveal-right::-webkit-scrollbar{width:3px}
+  .reveal-right::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+}
+/* Announcement card: fixed height on desktop so it doesn't shift layout */
+.announce-card{display:flex;align-items:center;justify-content:center;
+  border-radius:18px}
+@media(min-width:700px){
+  .announce-card{min-height:calc(100vh - 280px)}
+}
+@media(max-width:699px){
+  .announce-card{min-height:220px}
+}
+/* Compact srow for reveal scoreboard */
+.srow-compact{padding:.55rem .75rem;border-radius:10px}
+/* ── Toggle switch ───────────────────────────────────── */
+.toggle-wrap{display:flex;align-items:center;gap:.55rem;cursor:pointer;
+  -webkit-user-select:none;user-select:none}
+.toggle-track{position:relative;width:52px;height:28px;border-radius:14px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.08);
+  transition:background .25s,border-color .25s,box-shadow .25s;
+  flex-shrink:0}
+.toggle-track.on{
+  background:linear-gradient(135deg,var(--hot),var(--purple));
+  border-color:var(--hot);
+  box-shadow:0 0 12px rgba(255,45,120,.35)}
+.toggle-thumb{position:absolute;top:3px;left:3px;
+  width:20px;height:20px;border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.35);
+  transition:transform .22s cubic-bezier(.34,1.3,.64,1)}
+.toggle-track.on .toggle-thumb{transform:translateX(24px)}
+.toggle-label{font-size:.8rem;font-weight:600;color:var(--muted);
+  transition:color .2s;min-width:2rem}
+.toggle-track.on~.toggle-label{color:var(--text)}
+
+/* ── Inputs ──────────────────────────────────────────── */
+input[type=text]{background:rgba(255,255,255,.07);border:1px solid var(--border);
+  border-radius:12px;padding:.85rem 1rem;color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:1rem;width:100%;
+  min-height:50px;transition:border-color .2s;-webkit-appearance:none}
+input[type=text]::placeholder{color:var(--muted)}
+input[type=text]:focus{outline:none;border-color:var(--cyan);background:rgba(0,229,255,.05)}
+
+/* ── Layout ──────────────────────────────────────────── */
+.row{display:flex;align-items:center;gap:.6rem}
+.rowb{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:.7rem}
+.center{text-align:center}
+
+/* ── Section title ───────────────────────────────────── */
+.stitle{font-family:'Bebas Neue',sans-serif;font-size:1.45rem;
+  letter-spacing:2px;color:var(--gold);margin-bottom:.7rem}
+
+/* ── Tabs ────────────────────────────────────────────── */
+.tabs{display:flex;gap:.35rem;background:rgba(255,255,255,.05);
+  padding:.35rem;border-radius:13px;margin-bottom:1.1rem}
+.tab{flex:1;padding:.55rem .25rem;border-radius:9px;border:none;cursor:pointer;
+  font-family:'Outfit',sans-serif;font-weight:600;font-size:.8rem;
+  color:var(--muted);background:transparent;transition:all .18s;min-height:40px}
+.tab.on{background:rgba(255,45,120,.28);color:#fff;border:1px solid rgba(255,45,120,.45)}
+.tab:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+
+/* ── Pills ───────────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:.35rem;
+  padding:.28rem .75rem;border-radius:99px;font-size:.76rem;font-weight:700}
+.pill-on{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.28)}
+.pill-off{background:rgba(255,107,0,.1);color:var(--orange);border:1px solid rgba(255,107,0,.28)}
+.dot{width:6px;height:6px;border-radius:50%;background:currentColor;
+  animation:pulse 1.5s ease-in-out infinite;display:inline-block}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ── Alerts ──────────────────────────────────────────── */
+.alert{padding:.75rem 1rem;border-radius:11px;font-size:.86rem;line-height:1.5}
+.a-warn{background:rgba(255,180,50,.09);border:1px solid rgba(255,180,50,.28);color:#FFB432}
+.a-err{background:rgba(255,60,60,.09);border:1px solid rgba(255,60,60,.28);color:#FF7070}
+.a-ok{background:rgba(0,255,136,.09);border:1px solid rgba(0,255,136,.28);color:var(--green)}
+
+/* ── Participant cards + drag-and-drop ───────────────── */
+.pcard{background:rgba(255,255,255,.048);border:1px solid var(--border);
+  border-radius:13px;padding:.875rem;display:flex;align-items:center;gap:.75rem;
+  transition:box-shadow .18s,opacity .18s,transform .15s}
+.pcard.dragging{opacity:.45;box-shadow:0 0 0 2px var(--hot);transform:scale(.98)}
+.pcard.drag-over{box-shadow:0 -3px 0 0 var(--cyan),0 0 0 1px var(--border)}
+.drag-handle{cursor:grab;color:var(--muted);font-size:1rem;padding:.2rem .1rem;
+  flex-shrink:0;touch-action:none;-webkit-user-select:none;user-select:none;
+  display:flex;align-items:center;opacity:.5;transition:opacity .15s}
+.drag-handle:hover{opacity:1;color:var(--text)}
+.drag-handle:active{cursor:grabbing}
+/* Participant + role sub-line */
+.pcard-meta{font-size:.78rem;color:var(--muted);font-weight:400;
+  margin-top:.18rem;line-height:1.3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pcard-meta .pmeta-name{color:var(--text)}
+
+/* ── Emoji grid picker ───────────────────────────────── */
+.egrid{display:grid;grid-template-columns:repeat(8,1fr);
+  gap:.3rem;margin-top:.6rem;max-height:160px;overflow-y:auto;
+  -webkit-overflow-scrolling:touch}
+.ebtn{background:rgba(255,255,255,.05);border:1px solid var(--border);
+  border-radius:8px;padding:.3rem;cursor:pointer;min-height:38px;
+  display:flex;align-items:center;justify-content:center;transition:all .13s}
+.ebtn.on{background:rgba(255,45,120,.28);border-color:var(--hot)}
+
+/* ── Point chips ─────────────────────────────────────── */
+.pgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:.45rem;margin-top:.55rem}
+@media(max-width:380px){.pgrid{grid-template-columns:repeat(3,1fr)}}
+.pchip{height:58px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-family:'Bebas Neue',sans-serif;font-size:1.65rem;cursor:pointer;
+  border:2px solid transparent;transition:all .13s;-webkit-user-select:none;user-select:none}
+.pchip:active{transform:scale(.9)}
+.pchip:focus-visible{outline:3px solid var(--cyan);outline-offset:2px}
+.pc-av{background:rgba(255,255,255,.08);border-color:var(--border);color:var(--text)}
+.pc-on{background:linear-gradient(135deg,var(--hot),var(--purple));border-color:var(--hot);color:#fff}
+.pc-no{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.05);
+  color:rgba(255,255,255,.18);pointer-events:none}
+
+/* ── Progress bar ────────────────────────────────────── */
+.prog{background:rgba(255,255,255,.1);border-radius:99px;height:5px;overflow:hidden}
+.progf{height:100%;background:linear-gradient(90deg,var(--hot),var(--cyan));
+  border-radius:99px;transition:width .4s ease}
+
+/* ── Scoreboard row ──────────────────────────────────── */
+.srow{display:flex;align-items:center;gap:.65rem;
+  padding:.75rem .9rem;border-radius:13px;position:relative;overflow:hidden;
+  transition:background .5s,border .5s}
+.srow-lead{background:rgba(255,215,0,.09);border:1px solid rgba(255,215,0,.28)}
+.srow-norm{background:rgba(255,255,255,.04);border:1px solid var(--border)}
+.srank{font-family:'Bebas Neue',sans-serif;font-size:1.55rem;
+  color:var(--muted);width:1.9rem;text-align:center;flex-shrink:0;line-height:1}
+.sr1{color:var(--gold)}.sr2{color:#C0C0C0}.sr3{color:#CD7F32}
+.sname{font-weight:600;font-size:.9rem;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spts{font-family:'Bebas Neue',sans-serif;font-size:1.75rem;
+  flex-shrink:0;min-width:2.8rem;text-align:right;line-height:1}
+.sbar{position:absolute;left:0;bottom:0;height:3px;
+  background:linear-gradient(90deg,var(--hot),var(--cyan));transition:width .65s ease}
+
+/* ── Vote badges ─────────────────────────────────────── */
+.vbadge{display:inline-flex;align-items:center;gap:.3rem;
+  padding:.28rem .65rem;border-radius:20px;font-size:.78rem;font-weight:700;margin:.18rem}
+.vb1{background:rgba(100,200,100,.13);color:#64C864;border:1px solid rgba(100,200,100,.28)}
+.vb3{background:rgba(100,150,255,.13);color:#6496FF;border:1px solid rgba(100,150,255,.28)}
+.vb5{background:rgba(255,180,50,.13);color:#FFB432;border:1px solid rgba(255,180,50,.28)}
+.vb8{background:rgba(255,120,50,.13);color:#FF7832;border:1px solid rgba(255,120,50,.28)}
+.vb10{background:rgba(255,50,120,.13);color:#FF3278;border:1px solid rgba(255,50,120,.28)}
+.vb12{background:linear-gradient(135deg,rgba(255,215,0,.18),rgba(255,45,120,.18));
+  color:var(--gold);border:1px solid rgba(255,215,0,.45);font-size:.88rem}
+
+/* ── Reveal ──────────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.fu{animation:fadeUp .38s ease both}
+.aj{font-size:.78rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+.an{font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(1.8rem,6vw,2.8rem);color:var(--cyan);letter-spacing:3px;line-height:1.1}
+.asub{font-size:.82rem;color:var(--muted);margin:.35rem 0}
+.rrows{display:flex;flex-direction:column;gap:.35rem;
+  margin:.7rem 0;max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.rrow{display:flex;align-items:center;justify-content:space-between;
+  padding:.5rem .75rem;border-radius:10px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);
+  animation:fadeUp .3s ease both}
+.rpts{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;
+  padding:.05rem .6rem;border-radius:8px;min-width:50px;text-align:center}
+.rp12{color:var(--gold);background:rgba(255,215,0,.14);border:1px solid rgba(255,215,0,.38)}
+.rp10{color:#FF3278;background:rgba(255,50,120,.14);border:1px solid rgba(255,50,120,.28)}
+.rp8{color:#FF7832;background:rgba(255,120,50,.14);border:1px solid rgba(255,120,50,.28)}
+.rp5{color:#FFB432;background:rgba(255,180,50,.14);border:1px solid rgba(255,180,50,.28)}
+.rp3{color:#6496FF;background:rgba(100,150,255,.14);border:1px solid rgba(100,150,255,.28)}
+.rp1{color:#64C864;background:rgba(100,200,100,.14);border:1px solid rgba(100,200,100,.28)}
+
+/* ── Winner ──────────────────────────────────────────── */
+@keyframes bounce{from{transform:translateY(0)}to{transform:translateY(-11px)}}
+.crown{font-size:3.2rem;display:block;animation:bounce 1s ease infinite alternate;
+  -webkit-text-fill-color:initial}
+.wlabel{font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(1.6rem,5vw,2.8rem);color:var(--gold);letter-spacing:4px;margin:.6rem 0 .35rem}
+.wname{font-family:'Bebas Neue',sans-serif;
+  font-size:clamp(1.8rem,7vw,4rem);
+  background:linear-gradient(135deg,var(--gold),var(--hot),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;letter-spacing:2px;line-height:1.1}
+
+/* ── Confetti ────────────────────────────────────────── */
+.cf{position:fixed;pointer-events:none;
+  animation:fall var(--dur,3s) ease-in var(--del,0s) forwards;z-index:9999}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fall{0%{transform:translateY(-30px) rotate(0deg);opacity:1}
+  100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
+
+/* ── QR modal ────────────────────────────────────────── */
+.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.82);z-index:500;
+  display:flex;align-items:center;justify-content:center;padding:1.25rem;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.modal{background:#160030;border:1px solid var(--border);border-radius:22px;
+  padding:1.75rem;max-width:320px;width:100%;text-align:center;
+  animation:fadeUp .28s ease}
+.modal-danger{border-color:rgba(255,60,60,.35);background:#1a0010}
+.qrbox{background:#fff;border-radius:14px;padding:12px;display:inline-block;margin:.9rem 0}
+.qrbox canvas,.qrbox img{display:block}
+.urlbox{font-size:.72rem;color:var(--muted);word-break:break-all;
+  background:rgba(255,255,255,.05);padding:.5rem .75rem;
+  border-radius:9px;border:1px solid var(--border);margin-bottom:1rem;line-height:1.5}
+
+/* ── Misc ────────────────────────────────────────────── */
+.divider{height:1px;background:var(--border);margin:.9rem 0}
+.ctag{display:inline-block;padding:.2rem .6rem;border-radius:99px;font-size:.73rem;
+  font-weight:700;background:rgba(123,47,190,.2);color:#C090FF;border:1px solid rgba(123,47,190,.3)}
+.vrow{display:flex;align-items:center;justify-content:space-between;
+  padding:.55rem .75rem;border-radius:9px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border)}
+.vn{font-family:'Bebas Neue',sans-serif;font-size:1.35rem;color:var(--gold)}
+</style>
+</head>
+<body>
+<div id="sf"></div>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<!-- Firebase SDKs — must stay ABOVE the main <script> block -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics-compat.js"></script>
+
+<script>
+/* ── Stars ────────────────────────────────────────────── */
+(function(){
+  const sf=document.getElementById('sf');
+  for(let i=0;i<70;i++){
+    const s=document.createElement('div');s.className='star';
+    const z=Math.random()*2.5+.5;
+    s.style.cssText=`width:${z}px;height:${z}px;left:${Math.random()*100}%;`+
+      `top:${Math.random()*100}%;--d:${(Math.random()*3+2).toFixed(1)}s;`+
+      `animation-delay:${(Math.random()*4).toFixed(1)}s;`+
+      `opacity:${(Math.random()*.5+.1).toFixed(2)}`;
+    sf.appendChild(s);
+  }
+})();
+
+const FLAG_IMGS={
+  '🇦🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjRTQxRTIwIi8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI0U0MUUyMCIvPjwvc3ZnPg==',
+  '🇦🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzREE1Ii8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZFQ0MwMCIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNDNzI1MkEiLz48L3N2Zz4=',
+  '🇦🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQzgxMDJFIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNDODEwMkUiLz48L3N2Zz4=',
+  '🇧🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0YxMDFBIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDlBNDQiLz48L3N2Zz4=',
+  '🇧🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZBRTA0MiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNFRjMzNDAiLz48L3N2Zz4=',
+  '🇧🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyMzk1Ii8+PHBvbHlnb24gcG9pbnRzPSIxNSwwIDU1LDAgNTUsNDAiIGZpbGw9IiNGRUNCMDAiLz48L3N2Zz4=',
+  '🇧🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzAwOTY2RSIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNENjI2MTIiLz48L3N2Zz4=',
+  '🇭🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkYwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMTMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxNCIgZmlsbD0iIzAwMzBBMCIvPjwvc3ZnPg==',
+  '🇨🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMTgiIHk9IjEyIiB3aWR0aD0iMjQiIGhlaWdodD0iMiIgZmlsbD0iI0Q1NzgwMCIvPjwvc3ZnPg==',
+  '🇨🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRDcxNDFBIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjZmZmIi8+PHBvbHlnb24gcG9pbnRzPSIwLDAgMjgsMjAgMCw0MCIgZmlsbD0iIzExNDU3RSIvPjwvc3ZnPg==',
+  '🇩🇰':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQzYwQzMwIi8+PHJlY3QgeD0iMTcuMSIgeT0iMCIgd2lkdGg9IjEwLjIiIGhlaWdodD0iNDAiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIxNi42IiB3aWR0aD0iNjAiIGhlaWdodD0iNi44IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇪🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDA3MkNFIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzAwMCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNmZmYiLz48L3N2Zz4=',
+  '🇫🇮':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMTcuMSIgeT0iMCIgd2lkdGg9IjEwLjIiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDM1ODAiLz48cmVjdCB4PSIwIiB5PSIxNi42IiB3aWR0aD0iNjAiIGhlaWdodD0iNi44IiBmaWxsPSIjMDAzNTgwIi8+PC9zdmc+',
+  '🇫🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyMzk1Ii8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNFRDI5MzkiLz48L3N2Zz4=',
+  '🇩🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0NDMDAwMCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNGRkNFMDAiLz48L3N2Zz4=',
+  '🇬🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wIiB3aWR0aD0iNjAiIGhlaWdodD0iNC40IiBmaWxsPSIjMEQ1RUFGIi8+PHJlY3QgeD0iMCIgeT0iNC40IiB3aWR0aD0iNjAiIGhlaWdodD0iNC40IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iOC45IiB3aWR0aD0iNjAiIGhlaWdodD0iNC40IiBmaWxsPSIjMEQ1RUFGIi8+PHJlY3QgeD0iMCIgeT0iMTMuMyIgd2lkdGg9IjYwIiBoZWlnaHQ9IjQuNCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE3LjgiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQiIGZpbGw9IiMwRDVFQUYiLz48cmVjdCB4PSIwIiB5PSIyMi4yIiB3aWR0aD0iNjAiIGhlaWdodD0iNC40IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMjYuNyIgd2lkdGg9IjYwIiBoZWlnaHQ9IjQuNCIgZmlsbD0iIzBENUVBRiIvPjxyZWN0IHg9IjAiIHk9IjMxLjEiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIzNS42IiB3aWR0aD0iNjAiIGhlaWdodD0iNC40IiBmaWxsPSIjMEQ1RUFGIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjE4IiBmaWxsPSIjMEQ1RUFGIi8+PHJlY3QgeD0iNyIgeT0iMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjE4IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iNCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjEwIiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇭🇺':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0UyOTM5Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiM0NzcwNTAiLz48L3N2Zz4=',
+  '🇮🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzODk3Ii8+PHJlY3QgeD0iMTYuOCIgeT0iMCIgd2lkdGg9IjEwLjgiIGhlaWdodD0iNDAiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIxNi40IiB3aWR0aD0iNjAiIGhlaWdodD0iNy4yIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMTguOSIgeT0iMCIgd2lkdGg9IjYuNiIgaGVpZ2h0PSI0MCIgZmlsbD0iI0Q3MjgyOCIvPjxyZWN0IHg9IjAiIHk9IjE3LjgiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQiIGZpbGw9IiNENzI4MjgiLz48L3N2Zz4=',
+  '🇮🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMTY5QjYyIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNGRjg4M0UiLz48L3N2Zz4=',
+  '🇮🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5MjQ2Ii8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNDRTJCMzciLz48L3N2Zz4=',
+  '🇽🇰':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMjQ0QUE1Ii8+PHBvbHlnb24gcG9pbnRzPSIzMCw4IDMzLDE4IDQyLDE4IDM1LDIzIDM4LDMyIDMwLDI3IDIyLDMyIDI1LDIzIDE4LDE4IDI3LDE4IiBmaWxsPSIjRDRBRjM3Ii8+PC9zdmc+',
+  '🇱🇻':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjOUUzMDM5Ii8+PHJlY3QgeD0iMCIgeT0iMTQiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE3IiB3aWR0aD0iNjAiIGhlaWdodD0iNiIgZmlsbD0iIzlFMzAzOSIvPjwvc3ZnPg==',
+  '🇱🇮':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjMDAyQjdGIi8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI0NFMTEyNiIvPjwvc3ZnPg==',
+  '🇱🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRkRCOTEzIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzAwNkE0NCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNDMTI3MkQiLz48L3N2Zz4=',
+  '🇱🇺':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRUYzMzQwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMEEzRTAiLz48L3N2Zz4=',
+  '🇲🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjMwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAuMDAiIHk9IjAiIHdpZHRoPSIzMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0NGMTQyQiIvPjwvc3ZnPg==',
+  '🇲🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzREE1Ii8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZGRDEwMCIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNDQzAwMDAiLz48L3N2Zz4=',
+  '🇲🇨':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇲🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRDRBRjM3Ii8+PHJlY3QgeD0iNSIgeT0iNSIgd2lkdGg9IjUwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjMEE4QzU0Ii8+PC9zdmc+',
+  '🇳🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQUUxQzI4Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMyMTQ2OEIiLz48L3N2Zz4=',
+  '🇲🇰':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UyMDI4Ii8+PGxpbmUgeDE9IjMwIiB5MT0iMCIgeDI9IjMwIiB5Mj0iNDAiIHN0cm9rZT0iI0Y3RTgxNiIgc3Ryb2tlLXdpZHRoPSI0Ii8+PGxpbmUgeDE9IjAiIHkxPSIyMCIgeDI9IjYwIiB5Mj0iMjAiIHN0cm9rZT0iI0Y3RTgxNiIgc3Ryb2tlLXdpZHRoPSI0Ii8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iNjAiIHkyPSI0MCIgc3Ryb2tlPSIjRjdFODE2IiBzdHJva2Utd2lkdGg9IjMiLz48bGluZSB4MT0iNjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjQwIiBzdHJva2U9IiNGN0U4MTYiIHN0cm9rZS13aWR0aD0iMyIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjYiIGZpbGw9IiNGN0U4MTYiLz48L3N2Zz4=',
+  '🇳🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRUYyQjJEIi8+PHJlY3QgeD0iMTYuOCIgeT0iMCIgd2lkdGg9IjEwLjgiIGhlaWdodD0iNDAiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIxNi40IiB3aWR0aD0iNjAiIGhlaWdodD0iNy4yIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMTguOSIgeT0iMCIgd2lkdGg9IjYuNiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzAwMjg2OCIvPjxyZWN0IHg9IjAiIHk9IjE3LjgiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQiIGZpbGw9IiMwMDI4NjgiLz48L3N2Zz4=',
+  '🇵🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI0RDMTQzQyIvPjwvc3ZnPg==',
+  '🇵🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkYwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2NjAwIi8+PGNpcmNsZSBjeD0iMjIiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRDcwMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEuNSIvPjwvc3ZnPg==',
+  '🇷🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyQjdGIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZDRDExNiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇷🇺':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzAwMzlBNiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNENTJCMUUiLz48L3N2Zz4=',
+  '🇸🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjNUVCNkU0Ii8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇷🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQzYzNjNDIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzBDNDA3NiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNmZmYiLz48L3N2Zz4=',
+  '🇸🇰':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzBCNEVBMiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNFRTFDMjUiLz48L3N2Zz4=',
+  '🇸🇮':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDAzREE1Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNGRjAwMDAiLz48L3N2Zz4=',
+  '🇪🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjYzYwYjFlIi8+PHJlY3QgeD0iMCIgeT0iMTAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iI2ZmYzQwMCIvPjwvc3ZnPg==',
+  '🇸🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2QUE3Ii8+PHJlY3QgeD0iMTcuMSIgeT0iMCIgd2lkdGg9IjEwLjIiIGhlaWdodD0iNDAiIGZpbGw9IiNGRUNDMDIiLz48cmVjdCB4PSIwIiB5PSIxNi42IiB3aWR0aD0iNjAiIGhlaWdodD0iNi44IiBmaWxsPSIjRkVDQzAyIi8+PC9zdmc+',
+  '🇨🇭':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkYwMDAwIi8+PHJlY3QgeD0iMjQiIHk9IjgiIHdpZHRoPSIxMiIgaGVpZ2h0PSIyNCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjEyIiB5PSIxNiIgd2lkdGg9IjM2IiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48L3N2Zz4=',
+  '🇺🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjMDA1QkJCIi8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI0ZGRDUwMCIvPjwvc3ZnPg==',
+  '🇬🇧':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDEyMTY5Ii8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iNjAiIHkyPSI0MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEwIi8+PGxpbmUgeDE9IjYwIiB5MT0iMCIgeDI9IjAiIHkyPSI0MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEwIi8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iNjAiIHkyPSI0MCIgc3Ryb2tlPSIjQzgxMDJFIiBzdHJva2Utd2lkdGg9IjYiLz48bGluZSB4MT0iNjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjQwIiBzdHJva2U9IiNDODEwMkUiIHN0cm9rZS13aWR0aD0iNiIvPjxyZWN0IHg9IjIzIiB5PSIwIiB3aWR0aD0iMTQiIGhlaWdodD0iNDAiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIxMyIgd2lkdGg9IjYwIiBoZWlnaHQ9IjE0IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMjUiIHk9IjAiIHdpZHRoPSIxMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0M4MTAyRSIvPjxyZWN0IHg9IjAiIHk9IjE1IiB3aWR0aD0iNjAiIGhlaWdodD0iMTAiIGZpbGw9IiNDODEwMkUiLz48L3N2Zz4=',
+  '🇻🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjMwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkZFMDAwIi8+PHJlY3QgeD0iMzAuMDAiIHk9IjAiIHdpZHRoPSIzMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇦🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRDkwMDEyIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzAwMzNBMCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNGMkE4MDAiLz48L3N2Zz4=',
+  '🇦🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDBCNUUyIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0U4MTkyQyIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMEFGNjYiLz48L3N2Zz4=',
+  '🇬🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMjYiIHk9IjAiIHdpZHRoPSI4IiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkYwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTYiIHdpZHRoPSI2MCIgaGVpZ2h0PSI4IiBmaWxsPSIjRkYwMDAwIi8+PC9zdmc+',
+  '🇰🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDBBRkNBIi8+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iOCIgZmlsbD0iI0ZGRDcwMCIvPjxjaXJjbGUgY3g9IjIzIiBjeT0iMTYiIHI9IjYuNSIgZmlsbD0iIzAwQUZDQSIvPjwvc3ZnPg==',
+  '🇹🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRTMwQTE3Ii8+PGNpcmNsZSBjeD0iMjQiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIyNyIgY3k9IjE2IiByPSI5IiBmaWxsPSIjRTMwQTE3Ii8+PHBvbHlnb24gcG9pbnRzPSIzOCwxMiAzOS41LDE3IDQ0LDE3IDQwLjUsMjAgNDEuNSwyNSAzOCwyMiAzNC41LDI1IDM1LjUsMjAgMzIsMTcgMzYuNSwxNyIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇮🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iNyIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYiIGZpbGw9IiMwMDM4QjgiLz48cmVjdCB4PSIwIiB5PSIyNyIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYiIGZpbGw9IiMwMDM4QjgiLz48cG9seWdvbiBwb2ludHM9IjMwLDE0IDM1LDIzIDI1LDIzIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDM4QjgiIHN0cm9rZS13aWR0aD0iMiIvPjxwb2x5Z29uIHBvaW50cz0iMzAsMjYgMzUsMTcgMjUsMTciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMzhCOCIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
+  '🇦🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMTUiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMCIgZmlsbD0iIzAwMCIvPjxwb2x5Z29uIHBvaW50cz0iMzAsMiAzMi41LDEwIDQwLDEwIDM0LDE0LjUgMzYuNSwyMiAzMCwxOCAyMy41LDIyIDI2LDE0LjUgMjAsMTAgMjcuNSwxMCIgZmlsbD0iI0ZGRDEwMCIvPjwvc3ZnPg==',
+  '🇦🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjNzRBQ0RGIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiM3NEFDREYiLz48L3N2Zz4=',
+  '🇧🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA3NzhCIi8+PHJlY3QgeD0iMCIgeT0iMTQiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMiIgZmlsbD0iI0ZGQzcyQyIvPjxwb2x5Z29uIHBvaW50cz0iMCwwIDI2LDIwIDAsNDAiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+  '🇧🇧':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyNjdGIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZGRDcwMCIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDI2N0YiLz48L3N2Zz4=',
+  '🇧🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzRjg3Ii8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYiIGZpbGw9IiNDRTExMjYiLz48cmVjdCB4PSIwIiB5PSIzNCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYiIGZpbGw9IiNDRTExMjYiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjIwIiByPSIxMSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjkiIGZpbGw9IiMwMDI2N0YiLz48L3N2Zz4=',
+  '🇧🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRDUyQjFFIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0Y5RTMwMCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDdBM0QiLz48L3N2Zz4=',
+  '🇧🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5QzNCIi8+PHBvbHlnb24gcG9pbnRzPSIzMCw0IDU2LDIwIDMwLDM2IDQsMjAiIGZpbGw9IiNGRURGMDAiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjIwIiByPSI5IiBmaWxsPSIjMDAyNzc2Ii8+PC9zdmc+',
+  '🇨🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE1IiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkYwMDAwIi8+PHJlY3QgeD0iNDUiIHk9IjAiIHdpZHRoPSIxNSIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZGMDAwMCIvPjxwb2x5Z29uIHBvaW50cz0iMzAsOCAzMywxNyA0MSwxNyAzNSwyMyAzOCwzMiAzMCwyNiAyMiwzMiAyNSwyMyAxOSwxNyAyNywxNyIgZmlsbD0iI0ZGMDAwMCIvPjwvc3ZnPg==',
+  '🇨🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRDUyQjFFIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDAzOUE2Ii8+PHBvbHlnb24gcG9pbnRzPSIxMCw0IDExLjUsOSAxNiw5IDEyLjUsMTIgMTMuNSwxNyAxMCwxNCA2LjUsMTcgNy41LDEyIDQsOSA4LjUsOSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇨🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjRkNEMTE2Ii8+PHJlY3QgeD0iMCIgeT0iMTAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMC4wMCIgZmlsbD0iI0ZDRDExNiIvPjxyZWN0IHg9IjAiIHk9IjIwLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iMTAuMDAiIGZpbGw9IiMwMDMwODciLz48cmVjdCB4PSIwIiB5PSIzMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjQ0UxMTI2Ii8+PC9zdmc+',
+  '🇨🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiMwMDJCN0YiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0NFMTEyNiIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzAwMkI3RiIvPjwvc3ZnPg==',
+  '🇨🇺':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyQThGIi8+PHJlY3QgeD0iMCIgeT0iOCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIyNCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjgiIGZpbGw9IiNmZmYiLz48cG9seWdvbiBwb2ludHM9IjAsMCAyNiwyMCAwLDQwIiBmaWxsPSIjQ0MwMDAxIi8+PC9zdmc+',
+  '🇩🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjE1LjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2QjNGIi8+PHJlY3QgeD0iMTUuMDAiIHk9IjAiIHdpZHRoPSIxNS4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iIzAwMCIvPjxyZWN0IHg9IjMwLjAwIiB5PSIwIiB3aWR0aD0iMTUuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNGQ0QxMTYiLz48cmVjdCB4PSI0NS4wMCIgeT0iMCIgd2lkdGg9IjE1LjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇩🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyRDYyIi8+PHJlY3QgeD0iMjciIHk9IjAiIHdpZHRoPSI2IiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMTciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI3IiBoZWlnaHQ9IjE3IiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMzMiIHk9IjIzIiB3aWR0aD0iMjciIGhlaWdodD0iMTciIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇪🇨':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjRkZEMTAwIi8+PHJlY3QgeD0iMCIgeT0iMTAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMC4wMCIgZmlsbD0iI0ZGRDEwMCIvPjxyZWN0IHg9IjAiIHk9IjIwLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iMTAuMDAiIGZpbGw9IiMwMDMwODciLz48cmVjdCB4PSIwIiB5PSIzMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjQ0UxMTI2Ii8+PC9zdmc+',
+  '🇸🇻':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMEY0N0FGIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwRjQ3QUYiLz48L3N2Zz4=',
+  '🇬🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iNiIgeT0iNiIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjI4IiBmaWxsPSIjMDA5RTYwIi8+PHJlY3QgeD0iNiIgeT0iMTQiIHdpZHRoPSI0OCIgaGVpZ2h0PSIxMiIgZmlsbD0iI0ZDRDExNiIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjciIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇬🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNDk5N0QwIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiM0OTk3RDAiLz48L3N2Zz4=',
+  '🇬🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5RTYwIi8+PHBvbHlnb24gcG9pbnRzPSIwLDAgNDgsMjAgMCw0MCIgZmlsbD0iI0ZDRDExNiIvPjxwb2x5Z29uIHBvaW50cz0iMCwzIDQyLDIwIDAsMzciIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇭🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjMDAyMDlGIi8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI0QyMTAzNCIvPjwvc3ZnPg==',
+  '🇭🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDA3M0NGIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDczQ0YiLz48L3N2Zz4=',
+  '🇯🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAwIi8+PHBvbHlnb24gcG9pbnRzPSIwLDAgNjAsMCAzMCwyMCIgZmlsbD0iI0ZDRDExNiIvPjxwb2x5Z29uIHBvaW50cz0iMCw0MCA2MCw0MCAzMCwyMCIgZmlsbD0iI0ZDRDExNiIvPjxwb2x5Z29uIHBvaW50cz0iMywwIDU3LDAgMzAsMTciIGZpbGw9IiMwMDlCM0EiLz48cG9seWdvbiBwb2ludHM9IjMsNDAgNTcsNDAgMzAsMjMiIGZpbGw9IiMwMDlCM0EiLz48L3N2Zz4=',
+  '🇲🇽':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2ODQ3Ii8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇳🇮':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjM0U2RUI0Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMzRTZFQjQiLz48L3N2Zz4=',
+  '🇵🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMzAiIHk9IjAiIHdpZHRoPSIzMCIgaGVpZ2h0PSIyMCIgZmlsbD0iI0RBMTIxQSIvPjxyZWN0IHg9IjAiIHk9IjIwIiB3aWR0aD0iMzAiIGhlaWdodD0iMjAiIGZpbGw9IiMwMDcyQ0UiLz48L3N2Zz4=',
+  '🇵🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRDUyQjFFIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDM4QTgiLz48L3N2Zz4=',
+  '🇵🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRDkxMDIzIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNEOTEwMjMiLz48L3N2Zz4=',
+  '🇰🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5RTYwIi8+PHBvbHlnb24gcG9pbnRzPSIwLDQwIDYwLDAgNjAsNDAiIGZpbGw9IiNDQzAwMDEiLz48cG9seWdvbiBwb2ludHM9IjAsNDAgNjAsMCAwLDAiIGZpbGw9IiMwMDAiLz48bGluZSB4MT0iMCIgeTE9IjQwIiB4Mj0iNjAiIHkyPSIwIiBzdHJva2U9IiNGRkQxMDAiIHN0cm9rZS13aWR0aD0iOCIvPjwvc3ZnPg==',
+  '🇱🇨':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNjVDRkZGIi8+PHBvbHlnb24gcG9pbnRzPSIzMCw1IDM3LDI4IDMwLDI0IDIzLDI4IiBmaWxsPSIjRkNEMTE2IiBzdHJva2U9IiMwMDAiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==',
+  '🇻🇨':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5RTYwIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZDRDExNiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDlFNjAiLz48L3N2Zz4=',
+  '🇸🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiMzNzdFM0YiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0I0MEEyRCIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzM3N0UzRiIvPjwvc3ZnPg==',
+  '🇹🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgdHJhbnNmb3JtPSJyb3RhdGUoLTMwIDMwIDIwKSIgeD0iLTUiIHk9IjE1IiB3aWR0aD0iNzAiIGhlaWdodD0iMTAiIGZpbGw9IiMwMDAiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
+  '🇺🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQjIyMjM0Ii8+PHJlY3QgeD0iMCIgeT0iMC4wIiB3aWR0aD0iNjAiIGhlaWdodD0iMy4xIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMy4xIiB3aWR0aD0iNjAiIGhlaWdodD0iMy4xIiBmaWxsPSIjQjIyMjM0Ii8+PHJlY3QgeD0iMCIgeT0iNi4yIiB3aWR0aD0iNjAiIGhlaWdodD0iMy4xIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iOS4yIiB3aWR0aD0iNjAiIGhlaWdodD0iMy4xIiBmaWxsPSIjQjIyMjM0Ii8+PHJlY3QgeD0iMCIgeT0iMTIuMyIgd2lkdGg9IjYwIiBoZWlnaHQ9IjMuMSIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE1LjQiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzLjEiIGZpbGw9IiNCMjIyMzQiLz48cmVjdCB4PSIwIiB5PSIxOC41IiB3aWR0aD0iNjAiIGhlaWdodD0iMy4xIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMjEuNSIgd2lkdGg9IjYwIiBoZWlnaHQ9IjMuMSIgZmlsbD0iI0IyMjIzNCIvPjxyZWN0IHg9IjAiIHk9IjI0LjYiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzLjEiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIyNy43IiB3aWR0aD0iNjAiIGhlaWdodD0iMy4xIiBmaWxsPSIjQjIyMjM0Ii8+PHJlY3QgeD0iMCIgeT0iMzAuOCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjMuMSIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMzLjgiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzLjEiIGZpbGw9IiNCMjIyMzQiLz48cmVjdCB4PSIwIiB5PSIzNi45IiB3aWR0aD0iNjAiIGhlaWdodD0iMy4xIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjIyIiBmaWxsPSIjM0MzQjZFIi8+PC9zdmc+',
+  '🇺🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjQuNDQiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSI0LjQ0IiB3aWR0aD0iNjAiIGhlaWdodD0iNC40NCIgZmlsbD0iIzVCQTRDRiIvPjxyZWN0IHg9IjAiIHk9IjguODkiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQ0IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQ0IiBmaWxsPSIjNUJBNENGIi8+PHJlY3QgeD0iMCIgeT0iMTcuNzgiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQ0IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMjIuMjIiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQ0IiBmaWxsPSIjNUJBNENGIi8+PHJlY3QgeD0iMCIgeT0iMjYuNjciIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQ0IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMzEuMTEiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQ0IiBmaWxsPSIjNUJBNENGIi8+PHJlY3QgeD0iMCIgeT0iMzUuNTYiIHdpZHRoPSI2MCIgaGVpZ2h0PSI0LjQ0IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇻🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYuNjciIGZpbGw9IiNDRjA5MjEiLz48cmVjdCB4PSIwIiB5PSI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0NGMDkyMSIvPjxyZWN0IHg9IjAiIHk9IjEzLjMzIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iIzAwMzA4NyIvPjxyZWN0IHg9IjAiIHk9IjIwLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iIzAwMzA4NyIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0NFOUEwMCIvPjxyZWN0IHg9IjAiIHk9IjMzLjMzIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0NFOUEwMCIvPjwvc3ZnPg==',
+  '🇩🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjMwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2MjMzIi8+PHJlY3QgeD0iMzAuMDAiIHk9IjAiIHdpZHRoPSIzMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇦🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjQ0MwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iIzAwMCIvPjwvc3ZnPg==',
+  '🇧🇯':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkNEMTE2Ii8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDA4NzUxIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4NzUxIi8+PHJlY3QgeD0iMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iI0U4MTEyRCIvPjwvc3ZnPg==',
+  '🇧🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiM3NUFBREIiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzAwMCIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzc1QUFEQiIvPjwvc3ZnPg==',
+  '🇧🇫':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjRUYyQjJEIi8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iIzAwOUEwMCIvPjwvc3ZnPg==',
+  '🇧🇮':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iNjAiIHkyPSI0MCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjYiLz48bGluZSB4MT0iNjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjQwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNiIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEwIiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇨🇻':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzODkzIi8+PHJlY3QgeD0iMCIgeT0iMjUiIHdpZHRoPSI2MCIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMjIiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzIiBmaWxsPSIjQ0YyMDI3Ii8+PHJlY3QgeD0iMCIgeT0iMzAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIzIiBmaWxsPSIjQ0YyMDI3Ii8+PC9zdmc+',
+  '🇨🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA3QTVFIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0NFMTEyNiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNGQ0QxMTYiLz48L3N2Zz4=',
+  '🇨🇫':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzMDgyIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjMDAzMDgyIi8+PHJlY3QgeD0iMCIgeT0iMTAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjIwIiB3aWR0aD0iNjAiIGhlaWdodD0iMTAiIGZpbGw9IiMyODk3MjgiLz48cmVjdCB4PSIwIiB5PSIzMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjRkZDQjAwIi8+PHJlY3QgeD0iMjciIHk9IjAiIHdpZHRoPSI2IiBoZWlnaHQ9IjQwIiBmaWxsPSIjQkMwMDI2Ii8+PC9zdmc+',
+  '🇹🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyNjY0Ii8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0NDMDAwMSIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNGRUNCMDAiLz48L3N2Zz4=',
+  '🇰🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjM0E3NUM0Ii8+PHBvbHlnb24gcG9pbnRzPSIwLDAgMjIsMjAgMCw0MCIgZmlsbD0iIzNBNzVDNCIvPjxsaW5lIHgxPSIwIiB5MT0iMTAiIHgyPSI2MCIgeTI9IjEwIiBzdHJva2U9IiNGRkM3MjYiIHN0cm9rZS13aWR0aD0iMTAiLz48bGluZSB4MT0iMCIgeTE9IjIwIiB4Mj0iNjAiIHkyPSIyMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEwIi8+PGxpbmUgeDE9IjAiIHkxPSIzMCIgeDI9IjYwIiB5Mj0iMzAiIHN0cm9rZT0iI0NFMTEyNiIgc3Ryb2tlLXdpZHRoPSIxMCIvPjwvc3ZnPg==',
+  '🇨🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA3RkZGIi8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjQ0UxMTI2IiBzdHJva2Utd2lkdGg9IjgiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iNjAiIGhlaWdodD0iOCIgZmlsbD0iI0Y3RDYxOCIvPjxyZWN0IHg9IjAiIHk9IjMyIiB3aWR0aD0iNjAiIGhlaWdodD0iOCIgZmlsbD0iI0NFMTEyNiIvPjwvc3ZnPg==',
+  '🇨🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5NTQzIi8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjRkJERTRBIiBzdHJva2Utd2lkdGg9IjEwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5NTQzIi8+PHJlY3QgeD0iNDQiIHk9IjAiIHdpZHRoPSIxNiIgaGVpZ2h0PSI0MCIgZmlsbD0iI0RDMjQxRiIvPjwvc3ZnPg==',
+  '🇩🇯':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMTJBRDJCIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjNkFCMkU3Ii8+PHBvbHlnb24gcG9pbnRzPSIwLDAgMjgsMjAgMCw0MCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇪🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+  '🇬🇶':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjM0U5QTAwIi8+PHJlY3QgeD0iMCIgeT0iMTMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxNCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMiIGZpbGw9IiNFMzIxMTgiLz48cG9seWdvbiBwb2ludHM9IjAsMCAyNCwyMCAwLDQwIiBmaWxsPSIjM0Y3RkJGIi8+PC9zdmc+',
+  '🇪🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNDE4OUREIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjNEZEMTZBIi8+PHBvbHlnb24gcG9pbnRzPSIwLDAgNDAsMjAgMCw0MCIgZmlsbD0iI0ZDMCIvPjwvc3ZnPg==',
+  '🇸🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiMzRTVFQjkiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0ZGRDkwMCIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0IxMEMwQyIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0ZGRDkwMCIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzNFNUVCOSIvPjwvc3ZnPg==',
+  '🇪🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDc4OTMwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0ZDREQwOSIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNEQTEyMUEiLz48L3N2Zz4=',
+  '🇬🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDA5RTYwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0ZDRDExNiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDMxODkiLz48L3N2Zz4=',
+  '🇬🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiMzQTc3MjgiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0NFMTEyNiIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzNBNzcyOCIvPjwvc3ZnPg==',
+  '🇬🇭':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDA2QjNGIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0ZDRDExNiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇬🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZDRDExNiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDk0NjAiLz48L3N2Zz4=',
+  '🇬🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkNEMTE2Ii8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iIzAwOUE0NCIvPjxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIxOCIgaGVpZ2h0PSI0MCIgZmlsbD0iIzAwMCIvPjwvc3ZnPg==',
+  '🇨🇮':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRjc3RjAwIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDlBNDQiLz48L3N2Zz4=',
+  '🇰🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDA2NjAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0JCMDAwMCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDY2MDAiLz48L3N2Zz4=',
+  '🇱🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDA5NTQzIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDM1ODAiLz48L3N2Zz4=',
+  '🇱🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYuNjciIGZpbGw9IiNCRjBBMzAiLz48cmVjdCB4PSIwIiB5PSI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjEzLjMzIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0JGMEEzMCIvPjxyZWN0IHg9IjAiIHk9IjIwLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0JGMEEzMCIvPjxyZWN0IHg9IjAiIHk9IjMzLjMzIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iIzAwMjg2OCIvPjwvc3ZnPg==',
+  '🇱🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0NFMTEyNiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+  '🇲🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkMzRDMyIi8+PHJlY3QgeD0iMTQiIHk9IjAiIHdpZHRoPSI0NiIgaGVpZ2h0PSIyMCIgZmlsbD0iI0ZDM0QzMiIvPjxyZWN0IHg9IjE0IiB5PSIyMCIgd2lkdGg9IjQ2IiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDA3RTNBIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE0IiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇲🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0NFMTEyNiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMzMzlFMzUiLz48L3N2Zz4=',
+  '🇲🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMTRCNTNBIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZERUY0MiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇲🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2MjMzIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMiIgcj0iMTAiIGZpbGw9IiNGRkM0MDAiLz48Y2lyY2xlIGN4PSIzMyIgY3k9IjE4IiByPSI4IiBmaWxsPSIjMDA2MjMzIi8+PC9zdmc+',
+  '🇲🇺':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjRUEyODM5Ii8+PHJlY3QgeD0iMCIgeT0iMTAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMC4wMCIgZmlsbD0iIzFBMjA2RCIvPjxyZWN0IHg9IjAiIHk9IjIwLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iMTAuMDAiIGZpbGw9IiNGRkQ1MDAiLz48cmVjdCB4PSIwIiB5PSIzMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjMDBBNTUxIi8+PC9zdmc+',
+  '🇲🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQzEyNzJEIi8+PHBvbHlnb24gcG9pbnRzPSIzMCwxMiAzMi41LDIwIDQwLDIwIDM0LDI0LjUgMzYuNSwzMiAzMCwyNy41IDIzLjUsMzIgMjYsMjQuNSAyMCwyMCAyNy41LDIwIiBmaWxsPSJub25lIiBzdHJva2U9IiMwMDYyMzMiIHN0cm9rZS13aWR0aD0iMS41Ii8+PC9zdmc+',
+  '🇲🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiMwMDlBNDQiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0ZDRTEwMCIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzAwMCIvPjwvc3ZnPg==',
+  '🇳🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5NTQzIi8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjMDAzNTgwIiBzdHJva2Utd2lkdGg9IjE0Ii8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjEwIi8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjMDAzNTgwIiBzdHJva2Utd2lkdGg9IjYiLz48cG9seWdvbiBwb2ludHM9IjAsMCAyNCwyMCAwLDQwIiBmaWxsPSIjQ0MwMDAxIi8+PC9zdmc+',
+  '🇳🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRTA1MjA2Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwREIwMkIiLz48L3N2Zz4=',
+  '🇳🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4NzUxIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDg3NTEiLz48L3N2Zz4=',
+  '🇷🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMjA2MDNEIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0ZBRDIwMSIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMxRjc1RkUiLz48L3N2Zz4=',
+  '🇸🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMTJBRDJCIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0ZGQ0UwMCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMxMkFEMkIiLz48L3N2Zz4=',
+  '🇸🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA4NTNGIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZERUY0MiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNFMzFCMjMiLz48L3N2Zz4=',
+  '🇸🇨':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzRjg3Ii8+PHBvbHlnb24gcG9pbnRzPSIwLDQwIDYwLDAgNjAsNDAiIGZpbGw9IiMwMDdBNTMiLz48cG9seWdvbiBwb2ludHM9IjAsNDAgNDUsMCA2MCwwIDE1LDQwIiBmaWxsPSIjZmZmIi8+PHBvbHlnb24gcG9pbnRzPSIwLDQwIDMwLDAgNDUsMCAwLDMwIiBmaWxsPSIjREEwMDEwIi8+PHBvbHlnb24gcG9pbnRzPSIwLDQwIDE1LDAgMzAsMCAwLDIwIiBmaWxsPSIjRkNEODU2Ii8+PC9zdmc+',
+  '🇸🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMUVCNTNBIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDcyQzYiLz48L3N2Zz4=',
+  '🇸🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNDE4OUREIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNmZmYiLz48L3N2Zz4=',
+  '🇿🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA3QTREIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjE0IiBmaWxsPSIjREUzODMxIi8+PHJlY3QgeD0iMCIgeT0iMjYiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxNCIgZmlsbD0iIzAwMjM5NSIvPjxwb2x5Z29uIHBvaW50cz0iMCwwIDI2LDIwIDAsNDAiIGZpbGw9IiMwMDAiLz48cG9seWdvbiBwb2ludHM9IjAsNCAyMSwyMCAwLDM2IiBmaWxsPSIjRkZCNjEyIi8+PHJlY3QgeD0iMCIgeT0iMTciIHdpZHRoPSI2MCIgaGVpZ2h0PSI2IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇸🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiMwNzg5MzAiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0JCMDAwMCIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzA3ODkzMCIvPjwvc3ZnPg==',
+  '🇸🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRDIxMDM0Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+  '🇹🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMUVCNTNBIi8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjE4Ii8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjRkJEMDE2IiBzdHJva2Utd2lkdGg9IjgiLz48cG9seWdvbiBwb2ludHM9IjAsMCAzNiwwIDAsMjQiIGZpbGw9IiMwMEEzREQiLz48cG9seWdvbiBwb2ludHM9IjYwLDQwIDI0LDQwIDYwLDE2IiBmaWxsPSIjQ0UxMTI2Ii8+PC9zdmc+',
+  '🇹🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiMwMDZBNEUiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzAwNkE0RSIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzAwNkE0RSIvPjwvc3ZnPg==',
+  '🇹🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRTcwMDEzIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTMiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIzMCIgY3k9IjIwIiByPSIxMCIgZmlsbD0iI0U3MDAxMyIvPjxjaXJjbGUgY3g9IjMzIiBjeT0iMTciIHI9IjciIGZpbGw9IiNmZmYiLz48L3N2Zz4=',
+  '🇺🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjYuNjciIGZpbGw9IiMwMDAiLz48cmVjdCB4PSIwIiB5PSI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0ZDRTEwMCIvPjxyZWN0IHg9IjAiIHk9IjEzLjMzIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0Q5MDAwMCIvPjxyZWN0IHg9IjAiIHk9IjIwLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iIzAwMCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0ZDRTEwMCIvPjxyZWN0IHg9IjAiIHk9IjMzLjMzIiB3aWR0aD0iNjAiIGhlaWdodD0iNi42NyIgZmlsbD0iI0Q5MDAwMCIvPjwvc3ZnPg==',
+  '🇿🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMTk4QTAwIi8+PHJlY3QgeD0iNDIiIHk9IjAiIHdpZHRoPSI2IiBoZWlnaHQ9IjQwIiBmaWxsPSIjRUY3RDAwIi8+PHJlY3QgeD0iNDgiIHk9IjAiIHdpZHRoPSI2IiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iNTQiIHk9IjAiIHdpZHRoPSI2IiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PC9zdmc+',
+  '🇿🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjUuNzEiIGZpbGw9IiMwMDY0MDAiLz48cmVjdCB4PSIwIiB5PSI1LjcxIiB3aWR0aD0iNjAiIGhlaWdodD0iNS43MSIgZmlsbD0iI0ZGRDIwMCIvPjxyZWN0IHg9IjAiIHk9IjExLjQzIiB3aWR0aD0iNjAiIGhlaWdodD0iNS43MSIgZmlsbD0iI0QyMTAzNCIvPjxyZWN0IHg9IjAiIHk9IjE3LjE0IiB3aWR0aD0iNjAiIGhlaWdodD0iNS43MSIgZmlsbD0iIzAwMCIvPjxyZWN0IHg9IjAiIHk9IjIyLjg2IiB3aWR0aD0iNjAiIGhlaWdodD0iNS43MSIgZmlsbD0iI0QyMTAzNCIvPjxyZWN0IHg9IjAiIHk9IjI4LjU3IiB3aWR0aD0iNjAiIGhlaWdodD0iNS43MSIgZmlsbD0iI0ZGRDIwMCIvPjxyZWN0IHg9IjAiIHk9IjM0LjI5IiB3aWR0aD0iNjAiIGhlaWdodD0iNS43MSIgZmlsbD0iIzAwNjQwMCIvPjwvc3ZnPg==',
+  '🇦🇫':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI0QzMjAxMSIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMwMDdBMzYiLz48L3N2Zz4=',
+  '🇧🇭':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHBvbHlnb24gcG9pbnRzPSIyMCwwIDM1LDUgMjAsMTAgMzUsMTUgMjAsMjAgMzUsMjUgMjAsMzAgMzUsMzUgMjAsNDAiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇧🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2QTRFIi8+PGNpcmNsZSBjeD0iMjciIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNGNDJBNDEiLz48L3N2Zz4=',
+  '🇧🇹':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjRkY4MDAwIi8+PHJlY3QgeD0iMCIgeT0iMTAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMC4wMCIgZmlsbD0iI0ZGODAwMCIvPjxyZWN0IHg9IjAiIHk9IjIwLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iMTAuMDAiIGZpbGw9IiNFRjMzNDAiLz48cmVjdCB4PSIwIiB5PSIzMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEwLjAwIiBmaWxsPSIjRUYzMzQwIi8+PC9zdmc+',
+  '🇧🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRjdFMDE3Ii8+PGxpbmUgeDE9IjAiIHkxPSI1IiB4Mj0iNjAiIHkyPSIyNSIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjgiLz48bGluZSB4MT0iMCIgeTE9IjEzIiB4Mj0iNjAiIHkyPSIzMyIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjUiLz48L3N2Zz4=',
+  '🇰🇭':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDMyRUExIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0UwMDAyNSIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMzJFQTEiLz48L3N2Zz4=',
+  '🇨🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjREUyOTEwIi8+PHBvbHlnb24gcG9pbnRzPSI4LDUgOS41LDEwIDE0LDEwIDEwLjUsMTMgMTEuNSwxOCA4LDE1IDQuNSwxOCA1LjUsMTMgMiwxMCA2LjUsMTAiIGZpbGw9IiNGRkRFMDAiLz48L3N2Zz4=',
+  '🇹🇱':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjREMyNDFGIi8+PHBvbHlnb24gcG9pbnRzPSIwLDAgMzYsMjAgMCw0MCIgZmlsbD0iIzAwMCIvPjxwb2x5Z29uIHBvaW50cz0iMCwwIDI4LDIwIDAsNDAiIGZpbGw9IiNGOUM1MDkiLz48L3N2Zz4=',
+  '🇮🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRkY5OTMzIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMxMzg4MDgiLz48L3N2Zz4=',
+  '🇮🇩':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIwLjAwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMjAuMDAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMC4wMCIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇮🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMjM5RjQwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNEQTAwMDAiLz48L3N2Zz4=',
+  '🇮🇶':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+  '🇯🇵':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNCQzAwMkQiLz48L3N2Zz4=',
+  '🇯🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA3QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxNCIgZmlsbD0iI2ZmZiIvPjxwb2x5Z29uIHBvaW50cz0iMCwwIDI4LDIwIDAsNDAiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇰🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzIiBmaWxsPSIjMDA3QTNEIi8+PHJlY3QgeD0iMCIgeT0iMjciIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMyIgZmlsbD0iI0NFMTEyNiIvPjxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIxNiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzAwMCIvPjwvc3ZnPg==',
+  '🇰🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRTgxMTJEIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNGRkQxMDAiLz48L3N2Zz4=',
+  '🇱🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzAwMjg2OCIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇱🇧':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRkYwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNGRjAwMDAiLz48L3N2Zz4=',
+  '🇲🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0MwMDAxIi8+PHJlY3QgeD0iMCIgeT0iMC4wIiB3aWR0aD0iNjAiIGhlaWdodD0iMi45IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMi45IiB3aWR0aD0iNjAiIGhlaWdodD0iMi45IiBmaWxsPSIjQ0MwMDAxIi8+PHJlY3QgeD0iMCIgeT0iNS43IiB3aWR0aD0iNjAiIGhlaWdodD0iMi45IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iOC42IiB3aWR0aD0iNjAiIGhlaWdodD0iMi45IiBmaWxsPSIjQ0MwMDAxIi8+PHJlY3QgeD0iMCIgeT0iMTEuNCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIuOSIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE0LjMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyLjkiIGZpbGw9IiNDQzAwMDEiLz48cmVjdCB4PSIwIiB5PSIxNy4xIiB3aWR0aD0iNjAiIGhlaWdodD0iMi45IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMjAuMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIuOSIgZmlsbD0iI0NDMDAwMSIvPjxyZWN0IHg9IjAiIHk9IjIyLjkiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyLjkiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSIyNS43IiB3aWR0aD0iNjAiIGhlaWdodD0iMi45IiBmaWxsPSIjQ0MwMDAxIi8+PHJlY3QgeD0iMCIgeT0iMjguNiIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIuOSIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMxLjQiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyLjkiIGZpbGw9IiNDQzAwMDEiLz48cmVjdCB4PSIwIiB5PSIzNC4zIiB3aWR0aD0iNjAiIGhlaWdodD0iMi45IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMzcuMSIgd2lkdGg9IjYwIiBoZWlnaHQ9IjIuOSIgZmlsbD0iI0NDMDAwMSIvPjxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIyOCIgaGVpZ2h0PSIyMiIgZmlsbD0iIzAxMDA2NiIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTEiIHI9IjYiIGZpbGw9IiNGRkQxMDAiLz48Y2lyY2xlIGN4PSIxNSIgY3k9IjkiIHI9IjUiIGZpbGw9IiMwMTAwNjYiLz48L3N2Zz4=',
+  '🇲🇻':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRDIxMDM0Ii8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiMwMDdFM0EiLz48L3N2Zz4=',
+  '🇲🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMC4wMCIgeT0iMCIgd2lkdGg9IjIwLjAwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQzQyNzJGIi8+PHJlY3QgeD0iMjAuMDAiIHk9IjAiIHdpZHRoPSIyMC4wMCIgaGVpZ2h0PSI0MCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjQwLjAwIiB5PSIwIiB3aWR0aD0iMjAuMDAiIGhlaWdodD0iNDAiIGZpbGw9IiNDNDI3MkYiLz48L3N2Zz4=',
+  '🇲🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjRkVDQjAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iIzM0QjIzMyIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNFQTI4MzkiLz48L3N2Zz4=',
+  '🇳🇵':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHBvbHlnb24gcG9pbnRzPSIwLDAgMzIsMCAyMCwxNiAzMiwxNiAxNiw0MCAwLDQwIiBmaWxsPSIjMDAzODkzIi8+PHBvbHlnb24gcG9pbnRzPSIyLDIgMjgsMiAxNywxNSAyOCwxNSAxNCwzNyAyLDM3IiBmaWxsPSIjREMxNDNDIi8+PC9zdmc+',
+  '🇰🇵':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDI0RkEyIi8+PHJlY3QgeD0iMCIgeT0iMTEiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxOCIgZmlsbD0iI0NFMTIxRCIvPjxyZWN0IHg9IjAiIHk9IjEwIiB3aWR0aD0iNjAiIGhlaWdodD0iMS41IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMjguNSIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEuNSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjE4IiBjeT0iMjAiIHI9IjciIGZpbGw9IiNmZmYiLz48cG9seWdvbiBwb2ludHM9IjE4LDE0IDE5LjUsMTguNSAyNCwxOC41IDIwLjUsMjEuNSAyMS41LDI2IDE4LDIzIDE0LjUsMjYgMTUuNSwyMS41IDEyLDE4LjUgMTYuNSwxOC41IiBmaWxsPSIjQ0UxMjFEIi8+PC9zdmc+',
+  '🇴🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjREIxNjFCIi8+PHJlY3QgeD0iMTIiIHk9IjAiIHdpZHRoPSI0OCIgaGVpZ2h0PSIxMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjEyIiB5PSIyNyIgd2lkdGg9IjQ4IiBoZWlnaHQ9IjEzIiBmaWxsPSIjMDA4MDAwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEyIiBoZWlnaHQ9IjQwIiBmaWxsPSIjREIxNjFCIi8+PC9zdmc+',
+  '🇵🇰':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDE0MTFDIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE0IiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMzYiIGN5PSIyMCIgcj0iOSIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjM5IiBjeT0iMTciIHI9IjciIGZpbGw9IiMwMTQxMUMiLz48cG9seWdvbiBwb2ludHM9IjQ0LDEyIDQ1LjUsMTcgNTAsMTcgNDYuNSwyMCA0Ny41LDI1IDQ0LDIyIDQwLjUsMjUgNDEuNSwyMCAzOCwxNyA0Mi41LDE3IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇵🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDdBM0QiLz48L3N2Zz4=',
+  '🇵🇭':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzOEE4Ii8+PHJlY3QgeD0iMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iI0NFMTEyNiIvPjxwb2x5Z29uIHBvaW50cz0iMCwwIDI4LDIwIDAsNDAiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjIwIiByPSI0IiBmaWxsPSIjRkNEMTE2Ii8+PC9zdmc+',
+  '🇶🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjOEQxQjNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjE4IiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHBvbHlnb24gcG9pbnRzPSIxOCwwIDI4LDUgMTgsMTAgMjgsMTUgMTgsMjAgMjgsMjUgMTgsMzAgMjgsMzUgMTgsNDAiIGZpbGw9IiM4RDFCM0QiLz48L3N2Zz4=',
+  '🇸🇦':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2QzM1Ii8+PHJlY3QgeD0iOCIgeT0iMTgiIHdpZHRoPSI0NCIgaGVpZ2h0PSIyIiBmaWxsPSIjZmZmIi8+PHRleHQgeD0iMzAiIHk9IjE4IiBmb250LXNpemU9IjkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiNmZmYiIGZvbnQtZmFtaWx5PSJzZXJpZiI+JiN4NjI3OyYjeDY0NDsmI3g2NDQ7JiN4NjQ3OzwvdGV4dD48L3N2Zz4=',
+  '🇸🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRUYzMzQwIi8+PHJlY3QgeD0iMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iMTMiIHI9IjciIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIxOSIgY3k9IjEwIiByPSI1LjUiIGZpbGw9IiNFRjMzNDAiLz48L3N2Zz4=',
+  '🇰🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇱🇰':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjOEQxNTNBIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkY3NzAwIi8+PHJlY3QgeD0iMTAiIHk9IjAiIHdpZHRoPSI1IiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA2QjNGIi8+PC9zdmc+',
+  '🇸🇾':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+  '🇹🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjRkUwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDAwMDk1Ii8+PGNpcmNsZSBjeD0iMTQiIGN5PSIxMCIgcj0iNSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇹🇯':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0MwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDY2MDAiLz48L3N2Zz4=',
+  '🇹🇭':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjguMDAiIGZpbGw9IiNBNTE5MzEiLz48cmVjdCB4PSIwIiB5PSI4LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjE2LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iIzJEMkE0QSIvPjxyZWN0IHg9IjAiIHk9IjI0LjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjMyLjAwIiB3aWR0aD0iNjAiIGhlaWdodD0iOC4wMCIgZmlsbD0iI0E1MTkzMSIvPjwvc3ZnPg==',
+  '🇹🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzFBODRDIi8+PHJlY3QgeD0iOCIgeT0iMCIgd2lkdGg9IjgiIGhlaWdodD0iNDAiIGZpbGw9IiNBNTJBMkEiLz48L3N2Zz4=',
+  '🇦🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzIiBmaWxsPSIjMDA3MzJGIi8+PHJlY3QgeD0iMCIgeT0iMjciIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMyIgZmlsbD0iIzAwMCIvPjxyZWN0IHg9IjAiIHk9IjAiIHdpZHRoPSIxNiIgaGVpZ2h0PSI0MCIgZmlsbD0iI0ZGMDAwMCIvPjwvc3ZnPg==',
+  '🇺🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMUVCNTNBIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDlGQ0EiLz48L3N2Zz4=',
+  '🇻🇳':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjREEyNTFEIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNGRkZGMDAiLz48L3N2Zz4=',
+  '🇾🇪':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+  '🇦🇺':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAwMDhCIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjMwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDAwMDhCIi8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iMzAiIHkyPSIyMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjUiLz48bGluZSB4MT0iMzAiIHkxPSIwIiB4Mj0iMCIgeTI9IjIwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNSIvPjxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjMwIiB5Mj0iMjAiIHN0cm9rZT0iI0M4MTAyRSIgc3Ryb2tlLXdpZHRoPSIzIi8+PGxpbmUgeDE9IjMwIiB5MT0iMCIgeDI9IjAiIHkyPSIyMCIgc3Ryb2tlPSIjQzgxMDJFIiBzdHJva2Utd2lkdGg9IjMiLz48cmVjdCB4PSIxMiIgeT0iMCIgd2lkdGg9IjYiIGhlaWdodD0iMjAiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSI3IiB3aWR0aD0iMzAiIGhlaWdodD0iNiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjEzIiB5PSIwIiB3aWR0aD0iNCIgaGVpZ2h0PSIyMCIgZmlsbD0iI0M4MTAyRSIvPjxyZWN0IHg9IjAiIHk9IjgiIHdpZHRoPSIzMCIgaGVpZ2h0PSI0IiBmaWxsPSIjQzgxMDJFIi8+PHBvbHlnb24gcG9pbnRzPSI0Miw2IDQzLDkgNDYsOSA0My41LDExIDQ0LjUsMTQgNDIsMTIgMzkuNSwxNCA0MC41LDExIDM4LDkgNDEsOSIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==',
+  '🇫🇯':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNjhCRkU1Ii8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjE2IiBmaWxsPSIjMDEyMTY5Ii8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iMjQiIHkyPSIxNiIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjQiLz48bGluZSB4MT0iMjQiIHkxPSIwIiB4Mj0iMCIgeTI9IjE2IiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIvPjxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjI0IiB5Mj0iMTYiIHN0cm9rZT0iI0M4MTAyRSIgc3Ryb2tlLXdpZHRoPSIyLjUiLz48bGluZSB4MT0iMjQiIHkxPSIwIiB4Mj0iMCIgeTI9IjE2IiBzdHJva2U9IiNDODEwMkUiIHN0cm9rZS13aWR0aD0iMi41Ii8+PHJlY3QgeD0iOS41IiB5PSIwIiB3aWR0aD0iNSIgaGVpZ2h0PSIxNiIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjUuNSIgd2lkdGg9IjI0IiBoZWlnaHQ9IjUiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIxMC41IiB5PSIwIiB3aWR0aD0iMyIgaGVpZ2h0PSIxNiIgZmlsbD0iI0M4MTAyRSIvPjxyZWN0IHg9IjAiIHk9IjYuNSIgd2lkdGg9IjI0IiBoZWlnaHQ9IjMiIGZpbGw9IiNDODEwMkUiLz48L3N2Zz4=',
+  '🇰🇮':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQ0UxMTI2Ii8+PHJlY3QgeD0iMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iIzAwMzA4NyIvPjxjaXJjbGUgY3g9IjUiIGN5PSIzMCIgcj0iMiIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjExIiBjeT0iMzAiIHI9IjIiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIxNyIgY3k9IjMwIiByPSIyIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iMjMiIGN5PSIzMCIgcj0iMiIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjI5IiBjeT0iMzAiIHI9IjIiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSIzNSIgY3k9IjMwIiByPSIyIiBmaWxsPSIjZmZmIi8+PGNpcmNsZSBjeD0iNDEiIGN5PSIzMCIgcj0iMiIgZmlsbD0iI2ZmZiIvPjxjaXJjbGUgY3g9IjQ3IiBjeT0iMzAiIHI9IjIiIGZpbGw9IiNmZmYiLz48Y2lyY2xlIGN4PSI1MyIgY3k9IjMwIiByPSIyIiBmaWxsPSIjZmZmIi8+PHBvbHlnb24gcG9pbnRzPSIzMCw2IDMyLjUsMTQgNDAsMTQgMzQsMTggMzYsMjYgMzAsMjIgMjQsMjYgMjYsMTggMjAsMTQgMjcuNSwxNCIgZmlsbD0iI0ZGRDEwMCIvPjwvc3ZnPg==',
+  '🇲🇭':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzMDg3Ii8+PGxpbmUgeDE9IjAiIHkxPSI0MCIgeDI9IjYwIiB5Mj0iMCIgc3Ryb2tlPSIjRkY4MjAwIiBzdHJva2Utd2lkdGg9IjgiLz48bGluZSB4MT0iMCIgeTE9IjQwIiB4Mj0iNjAiIHkyPSIwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIvPjwvc3ZnPg==',
+  '🇫🇲':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNzVCMkREIi8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTIiIGZpbGw9IiNmZmYiLz48L3N2Zz4=',
+  '🇳🇷':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3QgeD0iMCIgeT0iMC4wMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEzLjMzIiBmaWxsPSIjMDAyQjdGIi8+PHJlY3QgeD0iMCIgeT0iMTMuMzMiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMy4zMyIgZmlsbD0iI0ZGQzYxRSIvPjxyZWN0IHg9IjAiIHk9IjI2LjY3IiB3aWR0aD0iNjAiIGhlaWdodD0iMTMuMzMiIGZpbGw9IiNmZmYiLz48L3N2Zz4=',
+  '🇳🇿':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAyNDdEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDAyNDdEIi8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iMjQiIHkyPSIyMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjQiLz48bGluZSB4MT0iMjQiIHkxPSIwIiB4Mj0iMCIgeTI9IjIwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIvPjxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjI0IiB5Mj0iMjAiIHN0cm9rZT0iI0NDMTQyQiIgc3Ryb2tlLXdpZHRoPSIyLjUiLz48bGluZSB4MT0iMjQiIHkxPSIwIiB4Mj0iMCIgeTI9IjIwIiBzdHJva2U9IiNDQzE0MkIiIHN0cm9rZS13aWR0aD0iMi41Ii8+PHJlY3QgeD0iOS41IiB5PSIwIiB3aWR0aD0iNSIgaGVpZ2h0PSIyMCIgZmlsbD0iI2ZmZiIvPjxyZWN0IHg9IjAiIHk9IjcuNSIgd2lkdGg9IjI0IiBoZWlnaHQ9IjUiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIxMC41IiB5PSIwIiB3aWR0aD0iMyIgaGVpZ2h0PSIyMCIgZmlsbD0iI0NDMTQyQiIvPjxyZWN0IHg9IjAiIHk9IjguNSIgd2lkdGg9IjI0IiBoZWlnaHQ9IjMiIGZpbGw9IiNDQzE0MkIiLz48cG9seWdvbiBwb2ludHM9IjQxLDUgNDIsOCA0NSw4IDQyLjUsMTAgNDMuNSwxMyA0MSwxMSAzOC41LDEzIDM5LjUsMTAgMzcsOCA0MCw4IiBmaWxsPSIjQ0MxNDJCIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iLjUiLz48L3N2Zz4=',
+  '🇵🇼':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjNEFBREQ2Ii8+PGNpcmNsZSBjeD0iMzAiIGN5PSIyMCIgcj0iMTEiIGZpbGw9IiNGRkRFMDAiLz48L3N2Zz4=',
+  '🇵🇬':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjMwIiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDAwIi8+PHJlY3QgeD0iMzAiIHk9IjIwIiB3aWR0aD0iMzAiIGhlaWdodD0iMjAiIGZpbGw9IiNDRTExMjYiLz48cG9seWdvbiBwb2ludHM9IjgsMyA5LjUsOCAxNCw4IDEwLjUsMTEgMTEuNSwxNiA4LDEzIDQuNSwxNiA1LjUsMTEgMiw4IDYuNSw4IiBmaWxsPSIjRkNEMTE2Ii8+PC9zdmc+',
+  '🇼🇸':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDAzMDg3Ii8+PGNpcmNsZSBjeD0iMTgiIGN5PSIxNiIgcj0iMTAiIGZpbGw9IiNDRTExMjYiLz48L3N2Zz4=',
+  '🇸🇧':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDc0NEMwIi8+PHJlY3QgeD0iMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iIzAwN0I0MCIvPjxsaW5lIHgxPSIwIiB5MT0iMCIgeDI9IjYwIiB5Mj0iNDAiIHN0cm9rZT0iI0ZDRTcwMCIgc3Ryb2tlLXdpZHRoPSI4Ii8+PC9zdmc+',
+  '🇹🇴':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjQzEwMDAwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjIyIiBoZWlnaHQ9IjE4IiBmaWxsPSIjZmZmIi8+PHJlY3QgeD0iMiIgeT0iNyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjQiIGZpbGw9IiNDMTAwMDAiLz48cmVjdCB4PSI5IiB5PSIwIiB3aWR0aD0iNCIgaGVpZ2h0PSIxOCIgZmlsbD0iI0MxMDAwMCIvPjwvc3ZnPg==',
+  '🇹🇻':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5RkNBIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI0IiBoZWlnaHQ9IjIwIiBmaWxsPSIjMDA5RkNBIi8+PGxpbmUgeDE9IjAiIHkxPSIwIiB4Mj0iMjQiIHkyPSIyMCIgc3Ryb2tlPSIjZmZmIiBzdHJva2Utd2lkdGg9IjQiLz48bGluZSB4MT0iMjQiIHkxPSIwIiB4Mj0iMCIgeTI9IjIwIiBzdHJva2U9IiNmZmYiIHN0cm9rZS13aWR0aD0iNCIvPjxyZWN0IHg9IjkuNSIgeT0iMCIgd2lkdGg9IjUiIGhlaWdodD0iMjAiIGZpbGw9IiNmZmYiLz48cmVjdCB4PSIwIiB5PSI3LjUiIHdpZHRoPSIyNCIgaGVpZ2h0PSI1IiBmaWxsPSIjZmZmIi8+PC9zdmc+',
+  '🇻🇺':'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2MCA0MCI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMDA5NTQzIi8+PHJlY3QgeD0iMCIgeT0iMjAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIyMCIgZmlsbD0iI0QyMTAzNCIvPjxwb2x5Z29uIHBvaW50cz0iMCwwIDI0LDIwIDAsNDAiIGZpbGw9IiMwMDAiLz48L3N2Zz4=',
+};
+
+/* Ei — Flag/Emoji component. Zero CDN dependency.
+   Country flags → inline base64 SVG (works offline, no CORS issues).
+   Other emoji   → native text span (works on all modern OS natively). */
+function Ei({e,cls,alt}){
+  const src=FLAG_IMGS[e];
+  if(src){
+    const szMap={'ei-sm':20,'ei-md':28,'ei-lg':38,'ei-xl':52,'ei-winner':80};
+    const sz=szMap[cls]||28;
+    return React.createElement('img',{
+      src,alt:alt||e,
+      width:sz,height:Math.round(sz*0.67),
+      className:'ei '+(cls||'ei-md'),
+      draggable:false,
+      style:{borderRadius:3,objectFit:'cover',display:'inline-block',verticalAlign:'middle'}
+    });
+  }
+  // Non-flag emoji: render as text — works natively everywhere
+  const szMap2={'ei-sm':'1.1rem','ei-md':'1.45rem','ei-lg':'1.9rem',
+                'ei-xl':'2.5rem','ei-winner':'3.8rem'};
+  return React.createElement('span',{
+    role:'img','aria-label':alt||e,
+    style:{fontSize:szMap2[cls]||'1.45rem',lineHeight:1,display:'inline-block',verticalAlign:'middle'}
+  },e);
+}
+
+/* ── Constants ────────────────────────────────────────── */
+const PTS=[1,3,5,8,10,12];
+
+const DEFAULTS=[
+  {id:'p1',name:'Sweden',      flag:'🇸🇪',participant:'',role:''},
+  {id:'p2',name:'Italy',       flag:'🇮🇹',participant:'',role:''},
+  {id:'p3',name:'France',      flag:'🇫🇷',participant:'',role:''},
+  {id:'p4',name:'Netherlands', flag:'🇳🇱',participant:'',role:''},
+  {id:'p5',name:'Ukraine',     flag:'🇺🇦',participant:'',role:''},
+  {id:'p6',name:'Ireland',     flag:'🇮🇪',participant:'',role:''},
+];
+
+const EMOJIS=['🇦🇱', '🇦🇩', '🇦🇹', '🇧🇾', '🇧🇪', '🇧🇦', '🇧🇬', '🇭🇷', '🇨🇾', '🇨🇿', '🇩🇰', '🇪🇪', '🇫🇮', '🇫🇷', '🇩🇪', '🇬🇷', '🇭🇺', '🇮🇸', '🇮🇪', '🇮🇹', '🇽🇰', '🇱🇻', '🇱🇮', '🇱🇹', '🇱🇺', '🇲🇹', '🇲🇩', '🇲🇨', '🇲🇪', '🇳🇱', '🇲🇰', '🇳🇴', '🇵🇱', '🇵🇹', '🇷🇴', '🇷🇺', '🇸🇲', '🇷🇸', '🇸🇰', '🇸🇮', '🇪🇸', '🇸🇪', '🇨🇭', '🇺🇦', '🇬🇧', '🇻🇦', '🇦🇲', '🇦🇿', '🇬🇪', '🇰🇿', '🇹🇷', '🇮🇱', '🇦🇬', '🇦🇷', '🇧🇸', '🇧🇧', '🇧🇿', '🇧🇴', '🇧🇷', '🇨🇦', '🇨🇱', '🇨🇴', '🇨🇷', '🇨🇺', '🇩🇲', '🇩🇴', '🇪🇨', '🇸🇻', '🇬🇩', '🇬🇹', '🇬🇾', '🇭🇹', '🇭🇳', '🇯🇲', '🇲🇽', '🇳🇮', '🇵🇦', '🇵🇾', '🇵🇪', '🇰🇳', '🇱🇨', '🇻🇨', '🇸🇷', '🇹🇹', '🇺🇸', '🇺🇾', '🇻🇪', '🇩🇿', '🇦🇴', '🇧🇯', '🇧🇼', '🇧🇫', '🇧🇮', '🇨🇻', '🇨🇲', '🇨🇫', '🇹🇩', '🇰🇲', '🇨🇩', '🇨🇬', '🇩🇯', '🇪🇬', '🇬🇶', '🇪🇷', '🇸🇿', '🇪🇹', '🇬🇦', '🇬🇲', '🇬🇭', '🇬🇳', '🇬🇼', '🇨🇮', '🇰🇪', '🇱🇸', '🇱🇷', '🇱🇾', '🇲🇬', '🇲🇼', '🇲🇱', '🇲🇷', '🇲🇺', '🇲🇦', '🇲🇿', '🇳🇦', '🇳🇪', '🇳🇬', '🇷🇼', '🇸🇹', '🇸🇳', '🇸🇨', '🇸🇱', '🇸🇴', '🇿🇦', '🇸🇸', '🇸🇩', '🇹🇿', '🇹🇬', '🇹🇳', '🇺🇬', '🇿🇲', '🇿🇼', '🇦🇫', '🇧🇭', '🇧🇩', '🇧🇹', '🇧🇳', '🇰🇭', '🇨🇳', '🇹🇱', '🇮🇳', '🇮🇩', '🇮🇷', '🇮🇶', '🇯🇵', '🇯🇴', '🇰🇼', '🇰🇬', '🇱🇦', '🇱🇧', '🇲🇾', '🇲🇻', '🇲🇳', '🇲🇲', '🇳🇵', '🇰🇵', '🇴🇲', '🇵🇰', '🇵🇸', '🇵🇭', '🇶🇦', '🇸🇦', '🇸🇬', '🇰🇷', '🇱🇰', '🇸🇾', '🇹🇼', '🇹🇯', '🇹🇭', '🇹🇲', '🇦🇪', '🇺🇿', '🇻🇳', '🇾🇪', '🇦🇺', '🇫🇯', '🇰🇮', '🇲🇭', '🇫🇲', '🇳🇷', '🇳🇿', '🇵🇼', '🇵🇬', '🇼🇸', '🇸🇧', '🇹🇴', '🇹🇻', '🇻🇺'];
+
+const VBCLS={1:'vb1',3:'vb3',5:'vb5',8:'vb8',10:'vb10',12:'vb12'};
+const RPCLS={1:'rp1',3:'rp3',5:'rp5',8:'rp8',10:'rp10',12:'rp12'};
+
+function uid(){return Math.random().toString(36).slice(2,8)}
+
+function doConfetti(){
+  const cols=['#FFD700','#FF2D78','#00E5FF','#7B2FBE','#00FF88','#FF6B00','#fff'];
+  for(let i=0;i<110;i++){
+    const el=document.createElement('div');el.className='cf';
+    const s=Math.random()*10+4;
+    el.style.cssText=`left:${Math.random()*100}vw;top:-30px;`+
+      `width:${s}px;height:${s}px;background:${cols[i%cols.length]};`+
+      `border-radius:${Math.random()>.5?'50%':'3px'};`+
+      `--dur:${(Math.random()*2+2.4).toFixed(1)}s;`+
+      `--del:${(Math.random()*2.2).toFixed(1)}s`;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(),5500);
+  }
+}
+
+const {useState,useEffect,useRef}=React;
+const h=React.createElement;
+
+/* ── Toastmasters SVG shield logo (brand colours: maroon #772432, navy #004165, gold #F2DF74) ── */
+const TM_SVG=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 92" width="62" height="72" aria-hidden="true">
+  <defs>
+    <linearGradient id="shieldG" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9B3040"/>
+      <stop offset="100%" stop-color="#5a1a24"/>
+    </linearGradient>
+    <linearGradient id="flameG" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#FF9500"/>
+    </linearGradient>
+  </defs>
+  <!-- Shield outer -->
+  <path d="M40 3 L77 18 L77 52 Q77 78 40 89 Q3 78 3 52 L3 18 Z" fill="url(#shieldG)" stroke="#F2DF74" stroke-width="2"/>
+  <!-- Shield inner border -->
+  <path d="M40 10 L71 23 L71 51 Q71 72 40 82 Q9 72 9 51 L9 23 Z" fill="none" stroke="rgba(242,223,116,0.22)" stroke-width="1"/>
+  <!-- Torch handle -->
+  <rect x="37" y="38" width="6" height="18" rx="2.5" fill="#F2DF74"/>
+  <rect x="33.5" y="54" width="13" height="4" rx="2" fill="#F2DF74"/>
+  <!-- Flame outer -->
+  <ellipse cx="40" cy="30" rx="8" ry="11" fill="url(#flameG)" opacity=".95"/>
+  <!-- Flame inner red -->
+  <ellipse cx="40" cy="28" rx="5" ry="7.5" fill="#CD202C"/>
+  <!-- Flame core white -->
+  <ellipse cx="40" cy="27" rx="2.5" ry="4" fill="#fff" opacity=".75"/>
+  <!-- Left stars -->
+  <text x="17" y="40" font-size="9" fill="#F2DF74" text-anchor="middle" font-family="Georgia,serif">&#9733;</text>
+  <text x="15" y="56" font-size="7" fill="#F2DF74" text-anchor="middle" font-family="Georgia,serif" opacity=".65">&#9733;</text>
+  <!-- Right stars -->
+  <text x="63" y="40" font-size="9" fill="#F2DF74" text-anchor="middle" font-family="Georgia,serif">&#9733;</text>
+  <text x="65" y="56" font-size="7" fill="#F2DF74" text-anchor="middle" font-family="Georgia,serif" opacity=".65">&#9733;</text>
+  <!-- Navy footer banner -->
+  <path d="M13 67 Q40 76 67 67 L67 73 Q40 83 13 73 Z" fill="#004165"/>
+  <text x="40" y="72.5" font-size="7" fill="#F2DF74" text-anchor="middle" font-family="Arial,sans-serif" font-weight="bold" letter-spacing="2">TM</text>
+</svg>`;
+
+/* BrandHeader shown at top of every screen */
+function BrandHeader({compact}){
+  return h('div',{className:'center',style:{marginBottom:compact?'.7rem':'1.25rem',paddingTop:compact?0:'.25rem'}},
+    h('div',{className:'tm-logo-wrap'},
+      h('div',{className:'tm-svg',dangerouslySetInnerHTML:{__html:TM_SVG}}),
+      h('div',{className:'tm-wordmark'},
+        h('div',{className:'tm-word-top'},'Toastmasters'),
+        h('div',{className:'tm-word-int'},'International')
+      )
+    ),
+    h('div',{className:'tm-divider'}),
+    h('span',{className:'logo',style:{fontSize:compact?'clamp(1.2rem,5vw,2rem)':undefined}},
+      'TASTE-VISION SONG CONTEST'),
+    h('div',{className:'tagline'},'Eurovision-Style Voting Experience')
+  );
+}
+
+/* ── Confirm Modal ────────────────────────────────────── */
+function ConfirmModal({title,message,confirmLabel,onConfirm,onCancel}){
+  // Trap focus & close on Escape
+  useEffect(()=>{
+    const handler=(e)=>{if(e.key==='Escape') onCancel();};
+    document.addEventListener('keydown',handler);
+    return()=>document.removeEventListener('keydown',handler);
+  },[]);
+  return h('div',{className:'backdrop',role:'dialog','aria-modal':'true',
+    'aria-labelledby':'confirm-title',
+    onClick:e=>{if(e.target===e.currentTarget)onCancel()}},
+    h('div',{className:'modal modal-danger'},
+      h('div',{style:{fontSize:'2.2rem',marginBottom:'.6rem'}},'⚠️'),
+      h('div',{id:'confirm-title',style:{
+        fontFamily:"'Bebas Neue'",fontSize:'1.4rem',letterSpacing:2,
+        color:'#FF7070',marginBottom:'.6rem'
+      }},title),
+      h('p',{style:{fontSize:'.88rem',color:'var(--muted)',lineHeight:1.6,marginBottom:'1.3rem'}},message),
+      h('div',{style:{display:'flex',gap:'.6rem',justifyContent:'center'}},
+        h('button',{className:'btn btn-secondary btn-sm',onClick:onCancel,
+          style:{flex:1}},'Cancel'),
+        h('button',{className:'btn btn-sm',onClick:onConfirm,
+          style:{flex:1,background:'rgba(255,60,60,.22)',color:'#FF7070',
+            border:'1px solid rgba(255,60,60,.45)',fontWeight:700},
+          autoFocus:true},confirmLabel)
+      )
+    )
+  );
+}
+
+/* ── QR Modal ─────────────────────────────────────────── */
+function QRModal({url,onClose}){
+  const ref=useRef(null);
+  useEffect(()=>{
+    if(!ref.current||!url) return;
+    ref.current.innerHTML='';
+    try{
+      new QRCode(ref.current,{text:url,width:188,height:188,
+        colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+    }catch(e){console.warn('QR failed',e)}
+  },[url]);
+  function copy(){
+    if(navigator.clipboard) navigator.clipboard.writeText(url).catch(()=>{});
+    else{const t=document.createElement('textarea');t.value=url;
+      document.body.appendChild(t);t.select();document.execCommand('copy');t.remove();}
+  }
+  return h('div',{className:'backdrop',onClick:e=>{if(e.target===e.currentTarget)onClose()},
+    role:'dialog','aria-modal':'true','aria-label':'Share QR Code'},
+    h('div',{className:'modal'},
+      h('div',{style:{fontFamily:"'Bebas Neue'",fontSize:'1.5rem',letterSpacing:2,
+        color:'var(--cyan)',marginBottom:'.4rem'}},'📱 SCAN TO VOTE'),
+      h('p',{style:{fontSize:'.82rem',color:'var(--muted)',marginBottom:'.1rem'}},
+        'Share this with voters — no login needed.'),
+      h('div',{className:'qrbox'},h('div',{ref})),
+      h('div',{className:'urlbox'},url),
+      h('div',{style:{display:'flex',gap:'.5rem',justifyContent:'center'}},
+        h('button',{className:'btn btn-secondary btn-sm',onClick:copy},'📋 Copy Link'),
+        h('button',{className:'btn btn-secondary btn-sm',onClick:onClose},'✕ Close')
+      )
+    )
+  );
+}
+
+/* ── FIREBASE CONFIG ──────────────────────────────────────
+   HOW TO SET UP (one-time, 5 minutes):
+   1. Go to https://console.firebase.google.com
+   2. Click "Add project" → name it (e.g. "taste-vision") → Continue
+   3. Disable Google Analytics → Create project
+   4. Click "Realtime Database" in the left menu → Create database
+      → Start in TEST MODE → Enable
+   5. Click the gear ⚙ icon → Project settings → scroll to
+      "Your apps" → click </> (Web) → Register app → copy the
+      firebaseConfig object values below and paste them in.
+   6. Done — all devices now share state in real time!
+
+   RUNNING WITHOUT FIREBASE (offline / demo mode):
+   If firebaseConfig is empty (all fields ''), the app runs
+   entirely in local memory exactly as before — no errors.
+────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════
+   TASTE-VISION SONG CONTEST — SETUP GUIDE
+   ═══════════════════════════════════════════════════════════════════
+
+   This application requires a FREE Firebase account to enable
+   real-time voting across multiple devices. Follow the steps below
+   to connect your own database. Takes about 5 minutes.
+
+   ── STEP 1: Create a Firebase project ───────────────────────────
+   1. Go to https://console.firebase.google.com
+   2. Click "Add project"
+   3. Give it a name (e.g. "my-song-contest")
+   4. Click Continue → you can enable or disable Google Analytics
+   5. Click "Create project" and wait for it to finish
+
+   ── STEP 2: Create a Realtime Database ──────────────────────────
+   1. In the left sidebar click "Build" → "Realtime Database"
+   2. Click "Create database"
+   3. Choose your region (pick the one closest to your event location)
+   4. Select "Start in test mode" → click "Enable"
+   5. Your database is now live
+
+   ── STEP 3: Get your Firebase config values ──────────────────────
+   1. Click the ⚙ gear icon (top left) → "Project settings"
+   2. Scroll down to "Your apps"
+   3. Click the </> (Web) icon
+   4. Enter any app nickname (e.g. "contest-app") → click "Register app"
+   5. Firebase will show you a config block — copy the values from it
+      into the FIREBASE_CONFIG object below
+
+   ── STEP 4: Fill in your values below ───────────────────────────
+   Replace each empty string '' with the value from your Firebase
+   config. Keep the quotes. Do NOT share this file publicly once
+   your values are filled in (it contains your API credentials).
+
+   ── STEP 5: Deploy ──────────────────────────────────────────────
+   1. Save this file
+   2. Go to https://app.netlify.com/drop
+   3. Drag and drop this file onto the page
+   4. Netlify gives you a public URL — share it with your voters!
+   5. Show the QR code from the Host panel for easy mobile access
+
+   ── SECURITY NOTE ───────────────────────────────────────────────
+   Your database starts in "test mode" which allows anyone with the
+   URL to read and write. This is fine for a private event. After
+   your event, go to Firebase Console → Realtime Database → Rules
+   and set ".write" to false to lock it down.
+
+   ── TROUBLESHOOTING ─────────────────────────────────────────────
+   • "Voting Closed" on voter phones → make sure the host has
+     clicked "Open Voting" in the Host Panel
+   • Votes not syncing → check that databaseURL is filled in below
+     and that your Firebase project has Realtime Database enabled
+   • Flags not showing → you need an internet connection; the flag
+     images are loaded as inline SVGs so they always render
+   • App shows spinner indefinitely → your Firebase config has an
+     error; double-check all values are copied correctly
+
+   ═══════════════════════════════════════════════════════════════ */
+
+const FIREBASE_CONFIG = {
+  apiKey:            '',   // e.g. 'AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+  authDomain:        '',   // e.g. 'my-project-12345.firebaseapp.com'
+  databaseURL:       '',   // e.g. 'https://my-project-12345-default-rtdb.firebaseio.com'
+  projectId:         '',   // e.g. 'my-project-12345'
+  storageBucket:     '',   // e.g. 'my-project-12345.appspot.com'
+  messagingSenderId: '',   // e.g. '123456789012'
+  appId:             '',   // e.g. '1:123456789012:web:abcdef1234567890'
+  measurementId:     ''    // e.g. 'G-XXXXXXXXXX' (optional, only if Analytics enabled)
+};
+
+// Initialise Firebase — deferred so SDKs are guaranteed loaded
+let db = null;
+let _fbInitDone = false;
+
+function initFirebase(){
+  if(_fbInitDone) return;
+  if(!FIREBASE_CONFIG.databaseURL) return; // offline/demo mode
+  if(typeof firebase === 'undefined') return; // SDK not ready yet, retry scheduled
+  _fbInitDone = true;
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.database();
+    if(FIREBASE_CONFIG.measurementId) firebase.analytics();
+    console.log('[TasteVision] Firebase connected ✓ | Analytics active');
+  }catch(e){
+    console.warn('[TasteVision] Firebase init failed, running in offline mode:', e.message);
+    db = null;
+  }
+}
+
+// Three-stage retry: immediate → DOMContentLoaded → window.load
+// Handles all network timing scenarios without any error messages
+initFirebase();
+document.addEventListener('DOMContentLoaded', initFirebase);
+window.addEventListener('load', initFirebase);
+
+// Helpers: read/write to Firebase or fall back to local setter
+function fbSet(path, value){
+  if(db) db.ref(path).set(value);
+}
+function fbOn(path, cb){
+  if(!db) return ()=>{};
+  const ref = db.ref(path);
+  ref.on('value', snap => cb(snap.val()));
+  return () => ref.off('value');
+}
+
+/* ── APP ──────────────────────────────────────────────── */
+function App(){
+  const [view,setView]   = useState('home');
+  const [parts,setParts] = useState(DEFAULTS);
+  const [votes,setVotes] = useState([]);
+  const [open,setOpen]   = useState(false);
+  const [reveal,setReveal]   = useState(null);
+  const [anonymous,setAnonymous] = useState(false);
+  const [voter,setVoter]     = useState(null);
+  const [voted,setVoted]     = useState(false);
+  const [showQR,setShowQR]   = useState(false);
+  const [voterEntry,setVoterEntry] = useState(false);
+  const [voterName,setVoterName]   = useState('');
+  // fbReady: true if no Firebase config (offline mode), false while connecting
+  const [fbReady,setFbReady] = useState(!FIREBASE_CONFIG.databaseURL);
+
+  const url = window.location.href.split('?')[0].split('#')[0];
+
+  // ── Subscribe to Firebase state on mount ─────────────────
+  useEffect(()=>{
+    // Ensure Firebase is initialised (handles the case where
+    // the SDK scripts hadn't loaded yet when the IIFE first ran)
+    initFirebase();
+
+    // If still no db after init attempt (no config / SDK failed), go offline
+    if(!db){
+      setFbReady(true); // show app immediately in offline mode
+      return;
+    }
+
+    const subs = [];
+    subs.push(fbOn('session/open',   v => { if(v!==null) setOpen(!!v); }));
+    subs.push(fbOn('session/parts',  v => { if(v) setParts(v); }));
+    subs.push(fbOn('session/anonymous', v => { if(v!==null) setAnonymous(!!v); }));
+    subs.push(fbOn('votes', v => {
+      if(v) setVotes(Object.values(v));
+      else  setVotes([]);
+    }));
+
+    // Mark ready after first read so voters never flash "Voting Closed"
+    db.ref('session/open').once('value').then(()=>setFbReady(true));
+
+    return () => subs.forEach(unsub => unsub());
+  }, []);
+
+  // ── Write helpers (push to Firebase + update local state) ─
+  function setOpenSync(val){
+    setOpen(val);
+    fbSet('session/open', val);
+  }
+  function setPartsSync(valOrFn){
+    setParts(prev=>{
+      const next = typeof valOrFn==='function' ? valOrFn(prev) : valOrFn;
+      fbSet('session/parts', next);
+      return next;
+    });
+  }
+  function setAnonymousSync(val){
+    setAnonymous(val);
+    fbSet('session/anonymous', val);
+  }
+  function addVote(id,label,asgn){
+    const v = {id:uid(),vid:id,label,asgn};
+    setVotes(prev=>[...prev,v]);
+    if(db) db.ref('votes/'+v.id).set(v);
+  }
+
+  function scores(){
+    const sc={};parts.forEach(p=>{sc[p.id]=0});
+    votes.forEach(v=>Object.entries(v.asgn).forEach(([pid,pts])=>{
+      if(sc[pid]!==undefined) sc[pid]+=pts;
+    }));
+    return sc;
+  }
+  function buildSeq(){
+    return votes.map(v=>({
+      vid:v.vid,
+      label:v.label,
+      rows:Object.entries(v.asgn).sort((a,b)=>a[1]-b[1]).map(([pid,pts])=>({pid,pts}))
+    }));
+  }
+  function startReveal(){setReveal({seq:buildSeq(),idx:0});setView('reveal');}
+  function demo(){
+    const dv=parts.map(p=>{
+      const others=[...parts.filter(o=>o.id!==p.id)].sort(()=>Math.random()-.5);
+      const asgn={};
+      PTS.forEach((pts,i)=>{if(others[i]) asgn[others[i].id]=pts});
+      return {id:uid(),vid:'d_'+p.id,label:p.name,asgn};
+    });
+    setVotes(dv);
+    setOpenSync(false);
+    if(db) dv.forEach(v=>db.ref('votes/'+v.id).set(v));
+  }
+  function resetVoting(){
+    setVotes([]);
+    setOpenSync(false);
+    setReveal(null);
+    setVoted(false);
+    setVoter(null);
+    if(db) db.ref('votes').remove();
+  }
+  function joinVoter(name){setVoter({id:uid(),name});setVoted(false);setView('voter');}
+
+  // Show loading spinner until Firebase delivers first state
+  if(!fbReady) return h('div',{style:{
+    minHeight:'100svh',display:'flex',flexDirection:'column',
+    alignItems:'center',justifyContent:'center',gap:'1rem',
+    background:'var(--dark)',color:'var(--muted)',fontFamily:"'Outfit',sans-serif"
+  }},
+    h(BrandHeader,{compact:true}),
+    h('div',{style:{fontSize:'.85rem',letterSpacing:'.1em',marginTop:'.5rem'}},
+      'Connecting to session...'),
+    h('div',{style:{
+      width:36,height:36,borderRadius:'50%',marginTop:'.5rem',
+      border:'3px solid var(--border)',borderTopColor:'var(--cyan)',
+      animation:'spin .8s linear infinite'
+    }})
+  );
+
+  return h(React.Fragment,null,
+    view==='home'   && h(Home,{setView,open,voterEntry,setVoterEntry,voterName,setVoterName,joinVoter,onQR:()=>setShowQR(true)}),
+    view==='host'   && h(Host,{parts,setParts:setPartsSync,votes,open,setOpen:setOpenSync,startReveal,demo,resetVoting,setView,scores,onQR:()=>setShowQR(true)}),
+    view==='voter'  && h(Voter,{parts,voter,addVote,setView,voted,setVoted,open}),
+    view==='reveal' && h(Reveal,{reveal,setReveal,parts,setView,anonymous,setAnonymous:setAnonymousSync,votes}),
+    showQR && h(QRModal,{url,onClose:()=>setShowQR(false)})
+  );
+}
+
+
+/* ── HOME ─────────────────────────────────────────────── */
+function Home({setView,open,voterEntry,setVoterEntry,voterName,setVoterName,joinVoter,onQR}){
+  const go=()=>{if(voterName.trim()) joinVoter(voterName.trim())};
+  return h('div',{className:'screen'},
+    h('h1',{className:'sr-only'},'Taste-Vision Song Contest'),
+    h(BrandHeader,{compact:false}),
+    h('div',{className:'card center',style:{padding:'1.75rem 1.25rem'}},
+      h('div',{style:{fontSize:'2.5rem',marginBottom:'.6rem'}},'🌟'),
+      h('h2',{style:{fontFamily:"'Bebas Neue'",fontSize:'1.55rem',letterSpacing:2,marginBottom:'.45rem'}},
+        'Welcome to the Contest'),
+      h('p',{style:{color:'var(--muted)',fontSize:'.88rem',lineHeight:1.65,marginBottom:'1.3rem'}},
+        'Cast your Eurovision scores or host the entire event from here.'),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'.7rem',marginBottom:'.9rem'}},
+        h('button',{style:{background:'var(--card2)',border:'1px solid rgba(255,45,120,.35)',
+          borderRadius:14,padding:'1.1rem .75rem',cursor:'pointer',textAlign:'center',color:'var(--text)'},
+          onClick:()=>setVoterEntry(!voterEntry),'aria-expanded':voterEntry},
+          h('div',{style:{fontSize:'1.7rem',marginBottom:'.35rem'}},'🗳️'),
+          h('div',{style:{fontWeight:700,fontSize:'.92rem',marginBottom:'.18rem'}},"I'm a Voter"),
+          h('div',{style:{fontSize:'.73rem',color:'var(--muted)'}},'Submit your points')
+        ),
+        h('button',{style:{background:'var(--card2)',border:'1px solid rgba(0,229,255,.22)',
+          borderRadius:14,padding:'1.1rem .75rem',cursor:'pointer',textAlign:'center',color:'var(--text)'},
+          onClick:()=>setView('host')},
+          h('div',{style:{fontSize:'1.7rem',marginBottom:'.35rem'}},'🎛️'),
+          h('div',{style:{fontWeight:700,fontSize:'.92rem',marginBottom:'.18rem'}},"I'm the Host"),
+          h('div',{style:{fontSize:'.73rem',color:'var(--muted)'}},'Manage & reveal votes')
+        )
+      ),
+      h('button',{className:'btn btn-secondary btn-full btn-sm',onClick:onQR},
+        '📱 Show QR Code — Share Voting Link'),
+      voterEntry && h('div',{style:{textAlign:'left',marginTop:'1rem',animation:'fadeUp .3s ease'}},
+        h('div',{className:'divider'}),
+        !open && h('div',{className:'alert a-warn',style:{marginBottom:'.7rem'}},
+          '⚠️ Voting is closed. Ask the host to open it.'),
+        h('label',{htmlFor:'vname',style:{display:'block',fontWeight:600,fontSize:'.88rem',marginBottom:'.45rem'}},
+          'Your display name'),
+        h('input',{type:'text',id:'vname',placeholder:'e.g. The Netherlands',
+          value:voterName,onChange:e=>setVoterName(e.target.value),
+          onKeyDown:e=>e.key==='Enter'&&go(),
+          autoComplete:'off',autoCapitalize:'words',inputMode:'text'}),
+        h('button',{className:'btn btn-primary btn-full',style:{marginTop:'.7rem'},
+          onClick:go,disabled:!voterName.trim()},'Enter Voting →'),
+        h('p',{style:{fontSize:'.72rem',color:'var(--muted)',marginTop:'.45rem',textAlign:'center'}},
+          'Your individual votes remain anonymous in the results.')
+      )
+    )
+  );
+}
+
+
+/* ── Flag Picker ─────────────────────────────────────── */
+const FLAG_REGIONS=[
+  {label:'🌍 Europe',   flags:['🇦🇱','🇦🇩','🇦🇲','🇦🇹','🇦🇿','🇧🇾','🇧🇪','🇧🇦','🇧🇬','🇭🇷','🇨🇾','🇨🇿','🇩🇰','🇪🇪','🇫🇮','🇫🇷','🇩🇪','🇬🇪','🇬🇷','🇭🇺','🇮🇸','🇮🇪','🇮🇹','🇽🇰','🇰🇿','🇱🇻','🇱🇮','🇱🇹','🇱🇺','🇲🇹','🇲🇩','🇲🇨','🇲🇪','🇲🇰','🇳🇱','🇳🇴','🇵🇱','🇵🇹','🇷🇴','🇷🇺','🇸🇲','🇷🇸','🇸🇰','🇸🇮','🇪🇸','🇸🇪','🇨🇭','🇹🇷','🇺🇦','🇬🇧','🇻🇦','🇮🇱']},
+  {label:'🌎 Americas', flags:['🇦🇬','🇦🇷','🇧🇸','🇧🇧','🇧🇿','🇧🇴','🇧🇷','🇨🇦','🇨🇱','🇨🇴','🇨🇷','🇨🇺','🇩🇲','🇩🇴','🇪🇨','🇸🇻','🇬🇩','🇬🇹','🇬🇾','🇭🇹','🇭🇳','🇯🇲','🇲🇽','🇳🇮','🇵🇦','🇵🇾','🇵🇪','🇰🇳','🇱🇨','🇻🇨','🇸🇷','🇹🇹','🇺🇸','🇺🇾','🇻🇪']},
+  {label:'🌍 Africa',   flags:['🇩🇿','🇦🇴','🇧🇯','🇧🇼','🇧🇫','🇧🇮','🇨🇻','🇨🇲','🇨🇫','🇹🇩','🇰🇲','🇨🇩','🇨🇬','🇩🇯','🇪🇬','🇬🇶','🇪🇷','🇸🇿','🇪🇹','🇬🇦','🇬🇲','🇬🇭','🇬🇳','🇬🇼','🇨🇮','🇰🇪','🇱🇸','🇱🇷','🇱🇾','🇲🇬','🇲🇼','🇲🇱','🇲🇷','🇲🇺','🇲🇦','🇲🇿','🇳🇦','🇳🇪','🇳🇬','🇷🇼','🇸🇹','🇸🇳','🇸🇨','🇸🇱','🇸🇴','🇿🇦','🇸🇸','🇸🇩','🇹🇿','🇹🇬','🇹🇳','🇺🇬','🇿🇲','🇿🇼']},
+  {label:'🌏 Asia',     flags:['🇦🇫','🇧🇭','🇧🇩','🇧🇹','🇧🇳','🇰🇭','🇨🇳','🇹🇱','🇮🇳','🇮🇩','🇮🇷','🇮🇶','🇯🇵','🇯🇴','🇰🇼','🇰🇬','🇱🇦','🇱🇧','🇲🇾','🇲🇻','🇲🇳','🇲🇲','🇳🇵','🇰🇵','🇴🇲','🇵🇰','🇵🇸','🇵🇭','🇶🇦','🇸🇦','🇸🇬','🇰🇷','🇱🇰','🇸🇾','🇹🇼','🇹🇯','🇹🇭','🇹🇲','🇦🇪','🇺🇿','🇻🇳','🇾🇪']},
+  {label:'🌏 Oceania',  flags:['🇦🇺','🇫🇯','🇰🇮','🇲🇭','🇫🇲','🇳🇷','🇳🇿','🇵🇼','🇵🇬','🇼🇸','🇸🇧','🇹🇴','🇹🇻','🇻🇺']},
+];
+const COUNTRY_NAMES={
+  '🇦🇱':'Albania','🇦🇩':'Andorra','🇦🇹':'Austria','🇧🇾':'Belarus','🇧🇪':'Belgium',
+  '🇧🇦':'Bosnia','🇧🇬':'Bulgaria','🇭🇷':'Croatia','🇨🇾':'Cyprus','🇨🇿':'Czechia',
+  '🇩🇰':'Denmark','🇪🇪':'Estonia','🇫🇮':'Finland','🇫🇷':'France','🇩🇪':'Germany',
+  '🇬🇷':'Greece','🇭🇺':'Hungary','🇮🇸':'Iceland','🇮🇪':'Ireland','🇮🇹':'Italy',
+  '🇽🇰':'Kosovo','🇱🇻':'Latvia','🇱🇮':'Liechtenstein','🇱🇹':'Lithuania','🇱🇺':'Luxembourg',
+  '🇲🇹':'Malta','🇲🇩':'Moldova','🇲🇨':'Monaco','🇲🇪':'Montenegro','🇳🇱':'Netherlands',
+  '🇲🇰':'N. Macedonia','🇳🇴':'Norway','🇵🇱':'Poland','🇵🇹':'Portugal','🇷🇴':'Romania',
+  '🇷🇺':'Russia','🇸🇲':'San Marino','🇷🇸':'Serbia','🇸🇰':'Slovakia','🇸🇮':'Slovenia',
+  '🇪🇸':'Spain','🇸🇪':'Sweden','🇨🇭':'Switzerland','🇺🇦':'Ukraine','🇬🇧':'United Kingdom',
+  '🇻🇦':'Vatican','🇦🇲':'Armenia','🇦🇿':'Azerbaijan','🇬🇪':'Georgia','🇰🇿':'Kazakhstan',
+  '🇹🇷':'Turkey','🇮🇱':'Israel','🇦🇬':'Antigua','🇦🇷':'Argentina','🇧🇸':'Bahamas',
+  '🇧🇧':'Barbados','🇧🇿':'Belize','🇧🇴':'Bolivia','🇧🇷':'Brazil','🇨🇦':'Canada',
+  '🇨🇱':'Chile','🇨🇴':'Colombia','🇨🇷':'Costa Rica','🇨🇺':'Cuba','🇩🇲':'Dominica',
+  '🇩🇴':'Dominican Rep','🇪🇨':'Ecuador','🇸🇻':'El Salvador','🇬🇩':'Grenada',
+  '🇬🇹':'Guatemala','🇬🇾':'Guyana','🇭🇹':'Haiti','🇭🇳':'Honduras','🇯🇲':'Jamaica',
+  '🇲🇽':'Mexico','🇳🇮':'Nicaragua','🇵🇦':'Panama','🇵🇾':'Paraguay','🇵🇪':'Peru',
+  '🇰🇳':'St Kitts','🇱🇨':'St Lucia','🇻🇨':'St Vincent','🇸🇷':'Suriname',
+  '🇹🇹':'Trinidad','🇺🇸':'USA','🇺🇾':'Uruguay','🇻🇪':'Venezuela','🇩🇿':'Algeria',
+  '🇦🇴':'Angola','🇧🇯':'Benin','🇧🇼':'Botswana','🇧🇫':'Burkina Faso','🇧🇮':'Burundi',
+  '🇨🇻':'Cape Verde','🇨🇲':'Cameroon','🇨🇫':'C. African Rep','🇹🇩':'Chad',
+  '🇰🇲':'Comoros','🇨🇩':'DR Congo','🇨🇬':'Congo','🇩🇯':'Djibouti','🇪🇬':'Egypt',
+  '🇬🇶':'Eq. Guinea','🇪🇷':'Eritrea','🇸🇿':'Eswatini','🇪🇹':'Ethiopia','🇬🇦':'Gabon',
+  '🇬🇲':'Gambia','🇬🇭':'Ghana','🇬🇳':'Guinea','🇬🇼':'Guinea-Bissau','🇨🇮':'Ivory Coast',
+  '🇰🇪':'Kenya','🇱🇸':'Lesotho','🇱🇷':'Liberia','🇱🇾':'Libya','🇲🇬':'Madagascar',
+  '🇲🇼':'Malawi','🇲🇱':'Mali','🇲🇷':'Mauritania','🇲🇺':'Mauritius','🇲🇦':'Morocco',
+  '🇲🇿':'Mozambique','🇳🇦':'Namibia','🇳🇪':'Niger','🇳🇬':'Nigeria','🇷🇼':'Rwanda',
+  '🇸🇹':'Sao Tome','🇸🇳':'Senegal','🇸🇨':'Seychelles','🇸🇱':'Sierra Leone',
+  '🇸🇴':'Somalia','🇿🇦':'South Africa','🇸🇸':'South Sudan','🇸🇩':'Sudan',
+  '🇹🇿':'Tanzania','🇹🇬':'Togo','🇹🇳':'Tunisia','🇺🇬':'Uganda','🇿🇲':'Zambia',
+  '🇿🇼':'Zimbabwe','🇦🇫':'Afghanistan','🇧🇭':'Bahrain','🇧🇩':'Bangladesh',
+  '🇧🇹':'Bhutan','🇧🇳':'Brunei','🇰🇭':'Cambodia','🇨🇳':'China','🇹🇱':'East Timor',
+  '🇮🇳':'India','🇮🇩':'Indonesia','🇮🇷':'Iran','🇮🇶':'Iraq','🇯🇵':'Japan',
+  '🇯🇴':'Jordan','🇰🇼':'Kuwait','🇰🇬':'Kyrgyzstan','🇱🇦':'Laos','🇱🇧':'Lebanon',
+  '🇲🇾':'Malaysia','🇲🇻':'Maldives','🇲🇳':'Mongolia','🇲🇲':'Myanmar','🇳🇵':'Nepal',
+  '🇰🇵':'North Korea','🇴🇲':'Oman','🇵🇰':'Pakistan','🇵🇸':'Palestine',
+  '🇵🇭':'Philippines','🇶🇦':'Qatar','🇸🇦':'Saudi Arabia','🇸🇬':'Singapore',
+  '🇰🇷':'South Korea','🇱🇰':'Sri Lanka','🇸🇾':'Syria','🇹🇼':'Taiwan',
+  '🇹🇯':'Tajikistan','🇹🇭':'Thailand','🇹🇲':'Turkmenistan','🇦🇪':'UAE',
+  '🇺🇿':'Uzbekistan','🇻🇳':'Vietnam','🇾🇪':'Yemen','🇦🇺':'Australia',
+  '🇫🇯':'Fiji','🇰🇮':'Kiribati','🇲🇭':'Marshall Islands','🇫🇲':'Micronesia',
+  '🇳🇷':'Nauru','🇳🇿':'New Zealand','🇵🇼':'Palau','🇵🇬':'Papua New Guinea',
+  '🇼🇸':'Samoa','🇸🇧':'Solomon Islands','🇹🇴':'Tonga','🇹🇻':'Tuvalu','🇻🇺':'Vanuatu',
+};
+function FlagPicker({selected,onSelect}){
+  const [search,setSearch]=useState('');
+  const q=search.toLowerCase().trim();
+  const match=e=>!q||(COUNTRY_NAMES[e]&&COUNTRY_NAMES[e].toLowerCase().includes(q));
+  const regions=q?[{label:'Search results',flags:Object.keys(FLAG_IMGS).filter(match)}]:FLAG_REGIONS;
+  return h('div',{style:{marginTop:'.6rem',background:'rgba(0,0,0,.25)',borderRadius:12,
+    border:'1px solid var(--border)',overflow:'hidden'}},
+    h('div',{style:{padding:'.4rem .5rem'}},
+      h('input',{type:'text',placeholder:'Search country...',value:search,
+        onChange:e=>setSearch(e.target.value),
+        style:{fontSize:'.82rem',minHeight:38,padding:'.4rem .75rem'},
+        'aria-label':'Search countries'})
+    ),
+    h('div',{style:{maxHeight:200,overflowY:'auto',padding:'0 .5rem .5rem',
+      WebkitOverflowScrolling:'touch'}},
+      regions.map(({label,flags})=>flags.length>0&&h('div',{key:label},
+        h('div',{style:{fontSize:'.63rem',color:'var(--muted)',fontWeight:700,
+          letterSpacing:'.08em',padding:'.2rem .25rem',textTransform:'uppercase'}},label),
+        h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(34px,1fr))',gap:'.22rem'}},
+          flags.map(e=>h('button',{key:e,
+            className:'ebtn '+(selected===e?'on':''),
+            onClick:()=>onSelect(e),
+            title:COUNTRY_NAMES[e]||e,
+            'aria-label':(COUNTRY_NAMES[e]||e)+(selected===e?' (selected)':''),
+            'aria-pressed':selected===e,
+            style:{padding:'.25rem',minHeight:32,borderRadius:7,
+              display:'flex',alignItems:'center',justifyContent:'center'}},
+            h(Ei,{e,cls:'ei-sm',alt:COUNTRY_NAMES[e]||e})
+          ))
+        )
+      ))
+    )
+  );
+}
+
+
+/* ── HOST ───────────────────────────────────────────────────── */
+function Host({parts,setParts,votes,open,setOpen,startReveal,demo,resetVoting,setView,scores,onQR}){
+  const [tab,setTab]=useState('countries');
+  const [name,setName]=useState('');
+  const [participant,setParticipant]=useState('');
+  const [role,setRole]=useState('');
+  const [flag,setFlag]=useState('🌍');
+  const [showEmoji,setShowEmoji]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [showConfirm,setShowConfirm]=useState(false);
+  const [dragSrc,setDragSrc]=useState(null);
+  const [dragOver,setDragOver]=useState(null);
+  const touchSrc=useRef(null);
+  const formRef=useRef(null);
+  const sc=scores();
+
+  function save(){
+    if(!name.trim()) return;
+    if(editId){
+      setParts(ps=>ps.map(p=>p.id===editId
+        ?{...p,name:name.trim(),flag,participant:participant.trim(),role:role.trim()}
+        :p));
+      setEditId(null);
+    } else {
+      setParts(ps=>[...ps,{id:uid(),name:name.trim(),flag,
+        participant:participant.trim(),role:role.trim()}]);
+    }
+    setName('');setParticipant('');setRole('');setFlag('🌍');setShowEmoji(false);
+  }
+  function edit(p){
+    setEditId(p.id);setName(p.name);setFlag(p.flag);
+    setParticipant(p.participant||'');setRole(p.role||'');
+    setShowEmoji(false);
+    requestAnimationFrame(()=>{
+      if(formRef.current) formRef.current.scrollIntoView({behavior:'smooth',block:'start'});
+    });
+  }
+  function cancel(){setEditId(null);setName('');setParticipant('');setRole('');setFlag('🌍');}
+  function handleReset(){resetVoting();setShowConfirm(false);}
+
+  function reorder(from,to){
+    if(from===to||from===null||to===null) return;
+    setParts(ps=>{const next=[...ps];const [m]=next.splice(from,1);next.splice(to,0,m);return next;});
+  }
+  function onDragStart(e,i){setDragSrc(i);e.dataTransfer.effectAllowed='move';}
+  function onDragEnter(i){setDragOver(i);}
+  function onDragOver(e){e.preventDefault();}
+  function onDragEnd(){reorder(dragSrc,dragOver);setDragSrc(null);setDragOver(null);}
+  function onTouchStart(e,i){touchSrc.current=i;}
+  function onTouchMove(e){
+    e.preventDefault();
+    const t=e.touches[0];
+    const el=document.elementFromPoint(t.clientX,t.clientY);
+    const card=el&&el.closest('[data-didx]');
+    if(card){const idx=parseInt(card.getAttribute('data-didx'));if(!isNaN(idx))setDragOver(idx);}
+  }
+  function onTouchEnd(){reorder(touchSrc.current,dragOver);touchSrc.current=null;setDragOver(null);}
+
+  const sorted=[...parts].map(p=>({...p,score:sc[p.id]||0})).sort((a,b)=>b.score-a.score);
+  const max=Math.max(...sorted.map(s=>s.score),1);
+
+  return h(React.Fragment,null,
+    showConfirm&&h(ConfirmModal,{
+      title:'RESTART VOTING?',
+      message:'This will erase all '+votes.length+' submitted vote'+(votes.length!==1?'s':'')+'. Countries and participants stay. Scores reset to zero. This cannot be undone.',
+      confirmLabel:'🗑 Yes, Reset Votes',
+      onConfirm:handleReset,onCancel:()=>setShowConfirm(false)
+    }),
+    h('div',{className:'screen'},
+      h('div',{className:'rowb',style:{marginBottom:'1.1rem'}},
+        h('div',null,
+          h('span',{className:'logo',style:{fontSize:'1.5rem'}},'🎛️ HOST PANEL'),
+          h('div',{className:'tagline'},'Event Manager')
+        ),
+        h('div',{className:'row',style:{gap:'.4rem'}},
+          h('button',{className:'btn btn-secondary btn-xs',onClick:onQR},'📱 QR'),
+          h('button',{className:'btn btn-secondary btn-xs',onClick:()=>setView('home')},'← Home')
+        )
+      ),
+      h('div',{className:'card card-xs rowb',style:{marginBottom:'.85rem'}},
+        h('div',{className:'row',style:{gap:'.6rem'}},
+          h('span',{className:'pill '+(open?'pill-on':'pill-off')},
+            h('span',{className:'dot'}),open?'Voting Open':'Closed'),
+          h('span',{style:{fontSize:'.8rem',color:'var(--muted)'}},
+            votes.length,' vote'+(votes.length!==1?'s':''))
+        ),
+        h('div',{className:'row',style:{gap:'.35rem',flexWrap:'wrap'}},
+          h('button',{className:'btn btn-xs '+(open?'btn-danger':'btn-secondary'),onClick:()=>setOpen(!open)},
+            open?'🔒 Close':'🔓 Open'),
+          h('button',{className:'btn btn-xs btn-secondary',onClick:demo},'🎲 Demo'),
+          h('button',{className:'btn btn-xs btn-gold',onClick:startReveal,disabled:votes.length===0},'▶ Reveal'),
+          h('button',{className:'btn btn-xs btn-danger',onClick:()=>setShowConfirm(true),
+            disabled:votes.length===0,'aria-label':'Restart voting'},'🔄 Restart')
+        )
+      ),
+      h('nav',{className:'tabs',role:'tablist'},
+        [['countries','🌍 Countries'],['scores','🏆 Scores'],['ballots','🗳️ Ballots']].map(([k,lbl])=>
+          h('button',{key:k,className:'tab '+(tab===k?'on':''),role:'tab',
+            'aria-selected':tab===k,onClick:()=>setTab(k)},lbl)
+        )
+      ),
+
+      /* COUNTRIES */
+      tab==='countries'&&h('div',null,
+        h('div',{className:'card',style:{marginBottom:'.85rem'},ref:formRef},
+          h('div',{className:'stitle',style:{marginBottom:'.7rem'}},editId?'✏️ Edit':'➕ Add'),
+          h('div',{style:{display:'flex',gap:'.45rem',flexWrap:'wrap',alignItems:'flex-start'}},
+            h('button',{className:'btn btn-secondary',
+              style:{minWidth:48,padding:'.5rem',borderRadius:10,flexShrink:0},
+              onClick:()=>setShowEmoji(!showEmoji),'aria-label':'Pick flag: '+flag,'aria-expanded':showEmoji},
+              h(Ei,{e:flag,cls:'ei-md',alt:flag})
+            ),
+            h('div',{style:{flex:1,display:'flex',flexDirection:'column',gap:'.4rem',minWidth:120}},
+              h('input',{type:'text',placeholder:'Country name',value:name,
+                onChange:e=>setName(e.target.value),onKeyDown:e=>e.key==='Enter'&&save(),
+                autoCapitalize:'words','aria-label':'Country name'}),
+              h('input',{type:'text',placeholder:'Participant name (optional)',value:participant,
+                onChange:e=>setParticipant(e.target.value),onKeyDown:e=>e.key==='Enter'&&save(),
+                autoCapitalize:'words','aria-label':'Participant name'}),
+              h('input',{type:'text',placeholder:'Role (optional)',value:role,
+                onChange:e=>setRole(e.target.value),onKeyDown:e=>e.key==='Enter'&&save(),
+                autoCapitalize:'words','aria-label':'Role'})
+            ),
+            h('div',{style:{display:'flex',flexDirection:'column',gap:'.4rem',flexShrink:0}},
+              h('button',{className:'btn btn-primary btn-sm',onClick:save,
+                disabled:!name.trim(),style:{minHeight:48}},editId?'Save':'Add'),
+              editId&&h('button',{className:'btn btn-secondary btn-sm',onClick:cancel},'✕')
+            )
+          ),
+          showEmoji&&h(FlagPicker,{selected:flag,onSelect:e=>{setFlag(e);setShowEmoji(false)}})
+        ),
+        parts.length===0&&h('div',{className:'alert a-warn'},'No participants yet. Add some above!'),
+        parts.length>1&&h('div',{style:{fontSize:'.72rem',color:'var(--muted)',
+          marginBottom:'.45rem',textAlign:'center',letterSpacing:'.05em'}},'↕️ Drag to reorder'),
+        h('div',{className:'col'},
+          parts.map((p,i)=>h('div',{
+            key:p.id,
+            className:'pcard'+(dragSrc===i?' dragging':'')+(dragOver===i&&dragSrc!==i?' drag-over':''),
+            draggable:true,'data-didx':i,
+            onDragStart:e=>onDragStart(e,i),onDragEnter:()=>onDragEnter(i),
+            onDragOver,onDragEnd,
+            onTouchStart:e=>onTouchStart(e,i),onTouchMove,onTouchEnd,
+            style:{touchAction:'none'}
+          },
+            h('span',{className:'drag-handle','aria-hidden':'true'},'⋮⋮'),
+            h(Ei,{e:p.flag,cls:'ei-lg',alt:p.name+' flag'}),
+            h('div',{style:{flex:1,minWidth:0}},
+              h('div',{style:{fontWeight:600,fontSize:'.93rem',overflow:'hidden',
+                textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name),
+              (p.participant||p.role)&&h('div',{className:'pcard-meta'},
+                p.participant&&h('span',{className:'pmeta-name'},p.participant),
+                p.participant&&p.role&&h('span',null,' · '),
+                p.role&&h('span',null,p.role)
+              ),
+              h('div',{style:{fontSize:'.7rem',color:'var(--muted)',marginTop:'.15rem'}},
+                sc[p.id]||0,' pts so far')
+            ),
+            h('div',{className:'row',style:{gap:'.3rem'}},
+              h('button',{className:'btn btn-secondary btn-xs',onClick:()=>edit(p),
+                'aria-label':'Edit '+p.name},'✏️'),
+              h('button',{className:'btn btn-danger btn-xs',
+                onClick:()=>setParts(ps=>ps.filter(x=>x.id!==p.id)),
+                'aria-label':'Remove '+p.name},'🗑')
+            )
+          ))
+        )
+      ),
+
+      /* SCORES */
+      tab==='scores'&&h('div',null,
+        sorted.length===0&&h('div',{className:'alert a-warn'},'No votes yet — try Demo!'),
+        h('div',{className:'col'},
+          sorted.map((p,i)=>h('div',{key:p.id,
+            className:'srow '+(i===0&&p.score>0?'srow-lead':'srow-norm')},
+            h('div',{className:'srank '+(i===0?'sr1':i===1?'sr2':i===2?'sr3':'')},i+1),
+            h(Ei,{e:p.flag,cls:'ei-md',alt:p.name}),
+            h('div',{style:{flex:1,minWidth:0,overflow:'hidden'}},
+              h('div',{style:{fontWeight:600,fontSize:'.9rem',overflow:'hidden',
+                textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name),
+              (p.participant||p.role)&&h('div',{className:'pcard-meta',style:{marginTop:'.1rem'}},
+                p.participant&&h('span',{className:'pmeta-name'},p.participant),
+                p.participant&&p.role&&h('span',null,' · '),
+                p.role&&h('span',null,p.role)
+              )
+            ),
+            h('div',{className:'spts',style:{color:i===0&&p.score>0?'var(--gold)':'var(--text)'}},p.score),
+            h('div',{className:'sbar','aria-hidden':'true',style:{width:(p.score/max*100)+'%'}})
+          ))
+        )
+      ),
+
+      /* BALLOTS */
+      tab==='ballots'&&h('div',null,
+        votes.length===0&&h('div',{className:'alert a-warn'},'No votes submitted yet.'),
+        h('div',{className:'col'},
+          votes.map(v=>h('div',{key:v.id,className:'card card-sm'},
+            h('div',{className:'rowb',style:{marginBottom:'.55rem'}},
+              h('div',{style:{fontWeight:700,fontSize:'.88rem'}},'🗳️ '+v.label),
+              h('span',{className:'ctag'},Object.keys(v.asgn).length+' pts')
+            ),
+            h('div',{style:{display:'flex',flexWrap:'wrap'}},
+              Object.entries(v.asgn).sort((a,b)=>b[1]-a[1]).map(([pid,pts])=>{
+                const p=parts.find(x=>x.id===pid);
+                return p&&h('span',{key:pid,className:'vbadge '+(VBCLS[pts]||'vb1')},
+                  h(Ei,{e:p.flag,cls:'ei-sm',alt:p.name}),
+                  ' ',p.name,' • ',pts
+                );
+              })
+            )
+          ))
+        )
+      )
+    )
+  );
+}
+
+
+/* ── VOTER ────────────────────────────────────────────── */
+function Voter({parts,voter,addVote,setView,voted,setVoted,open}){
+  const [asgn,setAsgn]=useState({});
+  const [active,setActive]=useState(null);
+  const [err,setErr]=useState('');
+  const [done,setDone]=useState(false);
+
+  const used=new Set(Object.values(asgn));
+  const allDone=PTS.every(p=>used.has(p));
+  const count=Object.keys(asgn).length;
+
+  function assign(pid,pts){
+    setErr('');
+    setAsgn(prev=>{
+      const n={...prev};
+      if(n[pid]===pts){delete n[pid];return n;}
+      const had=Object.entries(n).find(([,v])=>v===pts);
+      if(had) delete n[had[0]];
+      n[pid]=pts;
+      return n;
+    });
+  }
+  function submit(){
+    if(!allDone){setErr('Assign all 6 values: 1, 3, 5, 8, 10 and 12 points.');return;}
+    addVote(voter.id,voter.name,asgn);setDone(true);setVoted(true);
+  }
+
+  if(!open&&!done&&!voted)
+    return h('div',{className:'screen center'},
+      h(BrandHeader,{compact:true}),
+      h('div',{className:'card',style:{padding:'2.2rem 1.25rem'}},
+        h('div',{style:{fontSize:'2.6rem',marginBottom:'.7rem'}},'🔒'),
+        h('div',{style:{fontFamily:"'Bebas Neue'",fontSize:'1.55rem',letterSpacing:2,
+          color:'var(--orange)',marginBottom:'.6rem'}},'VOTING IS CLOSED'),
+        h('p',{style:{color:'var(--muted)',fontSize:'.88rem',marginBottom:'1.3rem'}},
+          'The host has not opened voting yet. Please wait!'),
+        h('button',{className:'btn btn-secondary btn-full',onClick:()=>setView('home')},'← Home')
+      )
+    );
+
+  if(done||voted)
+    return h('div',{className:'screen'},
+      h(BrandHeader,{compact:true}),
+      h('div',{className:'card center',style:{padding:'1.75rem 1.25rem'}},
+        h('div',{style:{fontSize:'2.8rem',marginBottom:'.65rem'}},'✅'),
+        h('div',{style:{fontFamily:"'Bebas Neue'",fontSize:'1.75rem',letterSpacing:2,
+          color:'var(--green)',marginBottom:'.55rem'}},'VOTES SUBMITTED!'),
+        h('p',{style:{color:'var(--muted)',fontSize:'.86rem',marginBottom:'1.2rem'}},
+          "You're done! Await the host's dramatic reveal."),
+        h('div',{className:'col',style:{textAlign:'left',marginBottom:'1.1rem'}},
+          Object.entries(asgn).sort((a,b)=>b[1]-a[1]).map(([pid,pts])=>{
+            const p=parts.find(x=>x.id===pid);
+            return p&&h('div',{key:pid,className:'vrow'},
+              h('div',{className:'row',style:{gap:'.5rem'}},
+                h(Ei,{e:p.flag,cls:'ei-sm',alt:p.name}),
+                h('span',{style:{fontWeight:600,fontSize:'.88rem'}},p.name)
+              ),
+              h('div',{className:'vn'},pts,' pts')
+            );
+          })
+        ),
+        h('button',{className:'btn btn-secondary btn-full',onClick:()=>setView('home')},'← Home')
+      )
+    );
+
+  return h('div',{className:'screen'},
+    h('div',{className:'rowb',style:{marginBottom:'1.1rem'}},
+      h('div',null,
+        h('h1',{style:{fontFamily:"'Bebas Neue'",fontSize:'1.5rem',letterSpacing:2,
+          background:'linear-gradient(135deg,var(--gold),var(--hot))',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}},'🗳️ YOUR BALLOT'),
+        h('div',{className:'tagline'},voter.name)
+      ),
+      h('button',{className:'btn btn-secondary btn-xs',onClick:()=>setView('home')},'✕ Exit')
+    ),
+    h('div',{className:'card card-xs',style:{marginBottom:'.85rem'}},
+      h('div',{className:'rowb',style:{marginBottom:'.35rem'}},
+        h('span',{style:{fontSize:'.78rem',color:'var(--muted)'}},'Assigned '+count+' / 6'),
+        h('div',{style:{display:'flex',gap:'.28rem'}},
+          PTS.map(p=>h('div',{key:p,style:{
+            width:24,height:24,borderRadius:5,display:'flex',
+            alignItems:'center',justifyContent:'center',fontSize:'.68rem',fontWeight:700,
+            background:used.has(p)?'rgba(255,215,0,.18)':'rgba(255,255,255,.06)',
+            color:used.has(p)?'var(--gold)':'var(--muted)',
+            border:'1px solid '+(used.has(p)?'rgba(255,215,0,.4)':'var(--border)')
+          }},p))
+        )
+      ),
+      h('div',{className:'prog'},h('div',{className:'progf',style:{width:(count/6*100)+'%'}}))
+    ),
+    err && h('div',{className:'alert a-err',role:'alert',style:{marginBottom:'.75rem'}},err),
+    h('div',{className:'col'},
+      parts.map(p=>{
+        const self=p.name.toLowerCase()===voter.name.toLowerCase();
+        const curPts=asgn[p.id];
+        const isOpen=active===p.id;
+        return h('div',{key:p.id,className:'card card-sm',
+          style:{opacity:self?.38:1,
+            border:isOpen?'1px solid var(--hot)':curPts?'1px solid rgba(255,215,0,.32)':'1px solid var(--border)',
+            transition:'border .2s'}},
+          h('div',{className:'rowb',style:{marginBottom:isOpen&&!self?'.6rem':0}},
+            h('div',{className:'row'},
+              /* Big flag per participant — clear on all mobile browsers */
+              h(Ei,{e:p.flag,cls:'ei-lg',alt:p.name+' flag'}),
+              h('div',{style:{minWidth:0}},
+                h('div',{style:{display:'flex',alignItems:'baseline',gap:'.35rem',flexWrap:'wrap'}},
+                  h('span',{style:{fontWeight:600,fontSize:'.9rem',overflow:'hidden',
+                    textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name),
+                  (p.participant||p.role)&&h('span',{style:{fontSize:'.75rem',color:'var(--muted)',
+                    fontWeight:400,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},
+                    [p.participant,p.role].filter(Boolean).join(' · '))
+                ),
+                self ? h('div',{style:{fontSize:'.7rem',color:'var(--muted)',marginTop:'.15rem'}},'Cannot vote for yourself') :
+                curPts ? h('div',{style:{fontSize:'.78rem',color:'var(--gold)',fontWeight:700,
+                  marginTop:'.15rem','aria-live':'polite'}},curPts+' pts ✓') :
+                h('div',{style:{fontSize:'.7rem',color:'var(--muted)',marginTop:'.15rem'}},'Tap to assign points')
+              )
+            ),
+            !self && h('button',{
+              className:'btn btn-xs '+(isOpen?'btn-danger':'btn-secondary'),
+              onClick:()=>setActive(isOpen?null:p.id),
+              'aria-expanded':isOpen,'aria-controls':'pts-'+p.id
+            },isOpen?'✕':'Assign')
+          ),
+          isOpen&&!self && h('div',{id:'pts-'+p.id,className:'pgrid',
+            role:'group','aria-label':'Assign points to '+p.name},
+            PTS.map(pts=>{
+              const sel=asgn[p.id]===pts;
+              const busy=used.has(pts)&&!sel;
+              return h('button',{key:pts,
+                className:'pchip '+(sel?'pc-on':busy?'pc-no':'pc-av'),
+                onClick:()=>{if(!busy){assign(p.id,pts);if(!sel)setActive(null);}},
+                disabled:busy,
+                'aria-label':pts+' pts'+(sel?' selected':busy?' taken':''),
+                'aria-pressed':sel
+              },pts);
+            })
+          )
+        );
+      })
+    ),
+    h('div',{style:{marginTop:'1.1rem'}},
+      !allDone && h('div',{className:'alert a-warn',role:'status',style:{marginBottom:'.75rem'}},
+        'Assign all 6 values (1, 3, 5, 8, 10, 12) to submit.'),
+      h('button',{className:'btn btn-gold btn-full',
+        style:{fontSize:'1.05rem',minHeight:54},
+        onClick:submit,disabled:!allDone},'🏆 Submit My Votes')
+    )
+  );
+}
+
+/* ── REVEAL ─────────────────────────────────────────────── */
+function Reveal({reveal,setReveal,parts,setView,anonymous,setAnonymous,votes}){
+  const [current,setCurrent]=useState(null);
+  const [rscores,setRscores]=useState({});
+  const [done,setDone]=useState(false);
+  const [auto,setAuto]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const t1=useRef(null);const t2=useRef(null);
+
+  const {seq,idx}=reveal;
+  const prog=seq.length>0?Math.round(idx/seq.length*100):0;
+
+  // Build stable anonymous label map: vid -> "Toastmaster N"
+  // Derived from votes order so labels are consistent throughout session
+  const anonMap=React.useMemo(()=>{
+    const map={};
+    votes.forEach((v,i)=>{map[v.vid]='Toastmaster '+(i+1);});
+    return map;
+  },[votes]);
+
+  function displayLabel(block){
+    if(!anonymous) return block.label;
+    return anonMap[block.vid]||block.label;
+  }
+
+  useEffect(()=>()=>{clearTimeout(t1.current);clearTimeout(t2.current)},[]);
+  useEffect(()=>{
+    if(auto&&!done&&!busy){t2.current=setTimeout(next,3500);}
+    return()=>clearTimeout(t2.current);
+  },[auto,done,busy,idx]);
+
+  function next(){
+    if(done||idx>=seq.length) return;
+    const block=seq[idx];
+    setCurrent(block);setBusy(true);
+    setRscores(prev=>{
+      const n={...prev};
+      block.rows.forEach(({pid,pts})=>{n[pid]=(n[pid]||0)+pts;});
+      return n;
+    });
+    const ni=idx+1;
+    setReveal(r=>({...r,idx:ni}));
+    if(ni>=seq.length){
+      t1.current=setTimeout(()=>{setDone(true);setBusy(false);doConfetti();},2200);
+    } else {
+      t1.current=setTimeout(()=>setBusy(false),2900);
+    }
+  }
+
+  const sorted=[...parts].map(p=>({...p,score:rscores[p.id]||0})).sort((a,b)=>b.score-a.score);
+  const max=Math.max(...sorted.map(s=>s.score),1);
+  const winner=sorted[0];
+
+  return h('div',{className:'reveal-screen'},
+    /* ── Header ── */
+    h('div',{className:'rowb reveal-header'},
+      h('h1',{className:'logo',style:{fontSize:'1.3rem',letterSpacing:3}},'📺 VOTE REVEAL'),
+      h('button',{className:'btn btn-secondary btn-xs',
+        onClick:()=>{clearTimeout(t1.current);clearTimeout(t2.current);setView('host')}},
+        '← Host')
+    ),
+
+    /* ── Controls strip (full width above both columns) ── */
+    h('div',{className:'card card-xs',style:{marginBottom:'.75rem'}},
+      h('div',{className:'rowb',style:{marginBottom:'.35rem',flexWrap:'wrap',gap:'.4rem'}},
+        h('span',{style:{fontSize:'.78rem',color:'var(--muted)'}},'Jury '+idx+' / '+seq.length),
+        h('div',{className:'row',style:{gap:'.5rem',flexWrap:'wrap'}},
+          /* Anonymous toggle sits inline with playback controls */
+          h('div',{className:'row',style:{gap:'.4rem',
+            paddingRight:'.6rem',borderRight:'1px solid var(--border)'}},
+            h('span',{style:{fontSize:'.75rem',color:'var(--muted)',fontWeight:600}},'\uD83D\uDD75\uFE0F Anon'),
+            h('label',{className:'toggle-wrap',
+              'aria-label':anonymous?'Disable anonymous voting':'Enable anonymous voting'},
+              h('input',{type:'checkbox',checked:anonymous,onChange:()=>setAnonymous(!anonymous),
+                style:{position:'absolute',opacity:0,width:0,height:0},'aria-hidden':'true'}),
+              h('div',{className:'toggle-track '+(anonymous?'on':'')},h('div',{className:'toggle-thumb'})),
+              h('span',{className:'toggle-label',style:{fontSize:'.72rem',minWidth:'1.5rem'}},
+                anonymous?'On':'Off')
+            )
+          ),
+          h('button',{className:'btn btn-xs btn-secondary',onClick:()=>setAuto(!auto),'aria-pressed':auto},
+            auto?'⏸ Pause':'▶ Auto'),
+          !done&&h('button',{className:'btn btn-xs btn-gold',onClick:next,disabled:busy||done},'Next Jury →')
+        )
+      ),
+      h('div',{className:'prog'},h('div',{className:'progf',style:{width:prog+'%'}}))
+    ),
+
+    /* ── Two-column body ── */
+    h('div',{className:'reveal-body'},
+
+      /* LEFT: Announcement panel */
+      h('div',{className:'reveal-left'},
+        h('div',{className:'card announce-card',
+          'aria-live':'assertive','aria-atomic':'true'},
+
+          done ?
+            h('div',{className:'center fu',style:{width:'100%',padding:'.75rem 1rem'}},
+              h('span',{className:'crown'},'👑'),
+              h('div',{className:'wlabel'},'WINNER'),
+              h('div',{style:{display:'flex',justifyContent:'center',margin:'.4rem 0'}},
+                h(Ei,{e:winner.flag,cls:'ei-winner',alt:winner.name+' flag'})
+              ),
+              winner.participant&&h('div',{style:{fontSize:'.85rem',color:'var(--muted)',marginBottom:'.2rem'}},
+                winner.participant+(winner.role?' \u00B7 '+winner.role:'')),
+              h('div',{className:'wname'},winner.name),
+              h('div',{style:{color:'var(--gold)',fontFamily:"'Bebas Neue'",fontSize:'2rem',
+                margin:'.4rem 0 1rem'}},winner.score,' POINTS'),
+              h('div',{style:{display:'flex',gap:'.5rem',justifyContent:'center',flexWrap:'wrap'}},
+                h('button',{className:'btn btn-secondary btn-sm',
+                  onClick:()=>{clearTimeout(t1.current);clearTimeout(t2.current);setView('host')}},
+                  '\u2190 Host Panel'),
+                h('button',{className:'btn btn-gold btn-sm',onClick:doConfetti},'\uD83C\uDF8A Celebrate!')
+              )
+            ) :
+
+          current ?
+            h('div',{className:'fu',style:{width:'100%',padding:'1rem'}},
+              h('div',{className:'aj'},'Votes from'),
+              h('div',{className:'an'},displayLabel(current)),
+              h('div',{className:'asub'},'awards points to...'),
+              h('div',{className:'rrows'},
+                [...current.rows].sort((a,b)=>b.pts-a.pts).map(({pid,pts},i)=>{
+                  const p=parts.find(x=>x.id===pid);
+                  return p&&h('div',{key:pid,className:'rrow',style:{animationDelay:(i*.07)+'s'}},
+                    h('div',{className:'row',style:{gap:'.5rem'}},
+                      h(Ei,{e:p.flag,cls:'ei-md',alt:p.name}),
+                      h('div',{style:{minWidth:0}},
+                        h('div',{style:{fontWeight:600,fontSize:'.88rem',overflow:'hidden',
+                          textOverflow:'ellipsis',whiteSpace:'nowrap'}},p.name),
+                        (p.participant||p.role)&&h('div',{className:'pcard-meta',style:{marginTop:'.05rem'}},
+                          p.participant&&h('span',{className:'pmeta-name'},p.participant),
+                          p.participant&&p.role&&h('span',null,' \u00B7 '),
+                          p.role&&h('span',null,p.role)
+                        )
+                      )
+                    ),
+                    h('div',{className:'rpts '+(RPCLS[pts]||'rp1')},pts)
+                  );
+                })
+              )
+            ) :
+
+            h('div',{className:'center',style:{color:'var(--muted)',padding:'2rem 1rem'}},
+              h('div',{style:{fontSize:'2rem',marginBottom:'.6rem'}},'\uD83C\uDFAC'),
+              h('div',{style:{fontSize:'.88rem'}},'Press "Next Jury" or tap Auto to start!')
+            )
+        )
+      ),
+
+      /* RIGHT: Live scoreboard — scrollable independently on desktop */
+      h('div',{className:'reveal-right',role:'region','aria-label':'Live scoreboard'},
+        h('div',{className:'stitle',style:{marginBottom:'.5rem',fontSize:'1.2rem'}},'\uD83C\uDFC6 SCOREBOARD'),
+        h('div',{className:'col',style:{gap:'.4rem'}},
+          sorted.map((p,i)=>h('div',{key:p.id,
+            className:'srow srow-compact '+(i===0&&p.score>0?'srow-lead':'srow-norm')},
+            h('div',{className:'srank '+(i===0?'sr1':i===1?'sr2':i===2?'sr3':''),
+              style:{fontSize:'1.25rem',width:'1.6rem'}},i+1),
+            h(Ei,{e:p.flag,cls:'ei-md',alt:p.name}),
+            h('div',{style:{flex:1,minWidth:0,overflow:'hidden'}},
+              h('div',{style:{fontWeight:600,fontSize:'.82rem',overflow:'hidden',
+                textOverflow:'ellipsis',whiteSpace:'nowrap',lineHeight:1.2}},p.name),
+              (p.participant||p.role)&&h('div',{className:'pcard-meta',
+                style:{fontSize:'.68rem',marginTop:'.06rem'}},
+                p.participant&&h('span',{className:'pmeta-name'},p.participant),
+                p.participant&&p.role&&h('span',null,' \u00B7 '),
+                p.role&&h('span',null,p.role)
+              )
+            ),
+            h('div',{className:'spts',
+              style:{fontSize:'1.45rem',color:i===0&&p.score>0?'var(--gold)':'var(--text)'}},p.score),
+            h('div',{className:'sbar','aria-hidden':'true',style:{width:(p.score/max*100)+'%'}})
+          ))
+        )
+      )
+    )
+  );
+}
+
+
+
+/* ── Mount ────────────────────────────────────────────── */
+ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+</script>
+</body>
+</html>
